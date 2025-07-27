@@ -44,6 +44,30 @@ A modern desktop application built with Tauri, Vue.js, Bootstrap, and SQLite to 
 - **Charts**: Chart.js
 - **Icons**: Bootstrap Icons
 
+## 📥 Download
+
+Get the latest version for your platform:
+
+### 🪟 Windows
+- **Installer**: [productivity-tracker_0.5.0_x64_en-US.msi](https://github.com/gabojkz/productivity-tracker/releases/latest/download/productivity-tracker_0.5.0_x64_en-US.msi)
+- **Portable**: [productivity-tracker_0.5.0_x64_en-US.exe](https://github.com/gabojkz/productivity-tracker/releases/latest/download/productivity-tracker_0.5.0_x64_en-US.exe)
+
+### 🍎 macOS
+- **Apple Silicon (M1/M2)**: [productivity-tracker_0.5.0_aarch64.dmg](https://github.com/gabojkz/productivity-tracker/releases/latest/download/productivity-tracker_0.5.0_aarch64.dmg)
+- **Intel**: [productivity-tracker_0.5.0_x64.dmg](https://github.com/gabojkz/productivity-tracker/releases/latest/download/productivity-tracker_0.5.0_x64.dmg)
+
+### 🐧 Linux
+- **AppImage**: [productivity-tracker_0.5.0_x86_64.AppImage](https://github.com/gabojkz/productivity-tracker/releases/latest/download/productivity-tracker_0.5.0_x86_64.AppImage)
+- **Debian/Ubuntu**: [productivity-tracker_0.5.0_amd64.deb](https://github.com/gabojkz/productivity-tracker/releases/latest/download/productivity-tracker_0.5.0_amd64.deb)
+
+### 🔄 Auto-Updates
+The app supports automatic updates. When a new version is available, you'll be notified and can update directly from the app.
+
+### 📋 All Releases
+For all available versions and release notes, visit: [GitHub Releases](https://github.com/gabojkz/productivity-tracker/releases)
+
+---
+
 ## Getting Started
 
 ### Prerequisites

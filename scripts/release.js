@@ -87,6 +87,11 @@ function updateVersion(type = 'patch') {
   // Update VERSION file
   fs.writeFileSync('VERSION', newVersion);
   
+  // Update Tauri config
+  const tauriConfig = readJsonFile('src-tauri/tauri.conf.json');
+  tauriConfig.version = newVersion;
+  fs.writeFileSync('src-tauri/tauri.conf.json', JSON.stringify(tauriConfig, null, 2));
+  
   return newVersion;
 }
 
@@ -179,6 +184,14 @@ Download the latest version for your platform from the assets below.
 `;
 }
 
+function updateReadmeDownloads(version) {
+  log('📝 Updating README download links...', 'blue');
+  
+  // Import and run the update-readme-downloads script
+  const updateReadmeScript = path.join(__dirname, 'update-readme-downloads.js');
+  exec(`node ${updateReadmeScript}`);
+}
+
 function commitAndPush(version) {
   log('📝 Committing changes...', 'blue');
   
@@ -200,6 +213,9 @@ function main() {
   try {
     // Update version
     const newVersion = updateVersion(type);
+    
+    // Update README download links
+    updateReadmeDownloads(newVersion);
     
     // Build app (unless skipped)
     if (!skipBuild) {

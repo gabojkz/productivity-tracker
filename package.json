@@ -13,6 +13,7 @@
     "release:minor": "node scripts/release.js minor",
     "release:major": "node scripts/release.js major",
     "release:build": "node scripts/release.js patch --skip-release",
+    "update-readme": "node scripts/update-readme-downloads.js",
     "clean": "rm -rf dist src-tauri/target",
     "changelog": "node scripts/generate-changelog.js",
     "version:check": "node scripts/check-versions.js",
