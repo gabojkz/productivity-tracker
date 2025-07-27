@@ -119,14 +119,30 @@ jobs:
         run: npm run tauri build
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # If you get 403 errors, create a Personal Access Token with repo scope
+          # and set it as a secret named PAT_TOKEN, then use:
+          # GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
           PKG_CONFIG_PATH: /usr/lib/x86_64-linux-gnu/pkgconfig:/usr/share/pkgconfig
           PKG_CONFIG_ALLOW_SYSTEM_CFLAGS: 1
+
+      - name: List build outputs
+        run: |
+          echo "Build outputs in src-tauri/target/release/:"
+          ls -la src-tauri/target/release/ || echo "No files found"
+          echo ""
+          echo "Build outputs in src-tauri/target/release/bundle/:"
+          ls -la src-tauri/target/release/bundle/ || echo "No bundle directory found"
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
-          path: src-tauri/target/release/
+          path: |
+            src-tauri/target/release/bundle/
+            src-tauri/target/release/*.exe
+            src-tauri/target/release/*.AppImage
+            src-tauri/target/release/*.dmg
+            src-tauri/target/release/*.msi
 
   create-release:
     needs: release
@@ -142,14 +158,24 @@ jobs:
         with:
           path: artifacts
 
+      - name: List downloaded artifacts
+        run: |
+          echo "Downloaded artifacts:"
+          find artifacts -type f -name "*" || echo "No artifacts found"
+          echo ""
+          echo "Artifact directories:"
+          ls -la artifacts/ || echo "No artifact directories found"
+
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            artifacts/*.dmg
-            artifacts/*.AppImage
-            artifacts/*.msi
-            artifacts/*.exe
+            artifacts/**/*.dmg
+            artifacts/**/*.AppImage
+            artifacts/**/*.msi
+            artifacts/**/*.exe
+            artifacts/**/*.deb
+            artifacts/**/*.rpm
           generate_release_notes: true
           draft: false
           prerelease: false
