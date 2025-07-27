@@ -118,10 +118,7 @@ jobs:
       - name: Build application
         run: npm run tauri build
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # If you get 403 errors, create a Personal Access Token with repo scope
-          # and set it as a secret named PAT_TOKEN, then use:
-          # GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
           PKG_CONFIG_PATH: /usr/lib/x86_64-linux-gnu/pkgconfig:/usr/share/pkgconfig
           PKG_CONFIG_ALLOW_SYSTEM_CFLAGS: 1
 
@@ -201,7 +198,7 @@ jobs:
           draft: false
           prerelease: false
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
 
   notify:
     needs: create-release
