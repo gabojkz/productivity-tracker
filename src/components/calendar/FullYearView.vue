@@ -1,21 +1,22 @@
 <template>
   <div class="full-year-view">
-    <div class="year-calendar">
-      <!-- Month Headers -->
-      <div class="month-headers">
-        <div
-          v-for="month in yearMonths"
-          :key="month.monthIndex"
-          class="month-header"
-          :class="getMonthColorClass(month.monthIndex)"
-        >
-          {{ month.monthName }}
-          <span v-if="isQuarterEnd(month.monthIndex)" class="quarter-label">
-            (Q{{ getQuarter(month.monthIndex) }})
-          </span>
-        </div>
+    <!-- Month Headers - Outside the scrollable container -->
+    <div class="month-headers">
+      <div
+        v-for="month in yearMonths"
+        :key="month.monthIndex"
+        class="month-header"
+        :class="getMonthColorClass(month.monthIndex)"
+      >
+        {{ month.monthName }}
+        <span v-if="isQuarterEnd(month.monthIndex)" class="quarter-label">
+          (Q{{ getQuarter(month.monthIndex) }})
+        </span>
       </div>
+    </div>
 
+    <!-- Scrollable Calendar Content -->
+    <div class="year-calendar">
       <!-- Day Rows - Show actual days for each month -->
       <div
         v-for="dayNumber in getMaxDaysInYear()" 
@@ -32,7 +33,9 @@
               'has-events': getDayEvents(month.monthIndex, dayNumber).length > 0,
               'valid-day': isValidDay(month.monthIndex, dayNumber),
               'invalid-day': !isValidDay(month.monthIndex, dayNumber),
-              'weekend': isWeekend(month.monthIndex, dayNumber) && !showWeekends
+              'is-weekend': isWeekend(month.monthIndex, dayNumber),
+              'is-today': isToday(month.monthIndex, dayNumber),
+              'is-holiday': isHoliday(month.monthIndex, dayNumber)
             }
           ]"
           @click="isValidDay(month.monthIndex, dayNumber) && selectDateFromYear(getDayData(month.monthIndex, dayNumber))"
@@ -45,6 +48,14 @@
             <div class="week-number" v-if="getWeekNumber(month.monthIndex, dayNumber)">
               {{ getWeekNumber(month.monthIndex, dayNumber) }}
             </div>
+            <div class="day-events">
+              <div v-for="event in getDayEvents(month.monthIndex, dayNumber)" :key="event.id" class="event-name">
+                <span class="badge text-bg-warning">{{ event.title }}</span>
+              </div>
+            </div>
+            <div v-if="isHoliday(month.monthIndex, dayNumber)" class="holiday-name">
+              {{ getHolidayName(month.monthIndex, dayNumber) }}
+            </div>
           </div>
         </div>
       </div>
@@ -53,6 +64,8 @@
 </template>
 
 <script>
+import holidayService from '../../services/holidayService.js';
+
 export default {
   name: "FullYearView",
   props: {
@@ -72,6 +85,16 @@ export default {
       type: Boolean,
       default: true,
     },
+    bankHolidays: {
+      type: String,
+      default: 'None'
+    }
+  },
+  data() {
+    return {
+      holidays: {},
+      isLoadingHolidays: false
+    };
   },
   computed: {
     yearMonths() {
@@ -118,18 +141,18 @@ export default {
     },
     getMonthColorClass(monthIndex) {
       const colorClasses = [
-        "month-blue", // January, February, March
-        "month-blue",
-        "month-blue",
-        "month-green", // April, May
-        "month-green",
-        "month-yellow", // June, July
-        "month-yellow",
-        "month-orange", // August, September
-        "month-orange",
-        "month-pink", // October
-        "month-purple", // November
-        "month-light-blue", // December
+        "month-default", // January, February, March
+        "month-default",
+        "month-default",
+        "month-default", // April, May
+        "month-default",
+        "month-default", // June, July
+        "month-default",
+        "month-default", // August, September
+        "month-default",
+        "month-default", // October
+        "month-default", // November
+        "month-default", // December
       ];
       return colorClasses[monthIndex] || "month-default";
     },
@@ -158,13 +181,31 @@ export default {
         monthIndex,
         dayNumber
       );
+      const dateString = date.toISOString().split("T")[0];
+      
       const dayEvents = this.events.filter((event) => {
-        const eventDate = new Date(event.date);
-        return eventDate.toDateString() === date.toDateString();
+        // Handle multi-day events
+        if (event.isMultiDay) {
+          // Check if event has specific event days
+          if (event.eventDays) {
+            const eventDayList = event.eventDays.split(',').map(d => d.trim());
+            return eventDayList.includes(dateString);
+          } else {
+            // Check if date is within start and end date range
+            const startDate = new Date(event.startDate);
+            const endDate = new Date(event.endDate);
+            const currentDate = new Date(dateString);
+            return currentDate >= startDate && currentDate <= endDate;
+          }
+        } else {
+          // Single day event
+          const eventDate = new Date(event.startDate || event.date);
+          return eventDate.toDateString() === date.toDateString();
+        }
       });
 
       return {
-        date: date.toISOString().split("T")[0],
+        date: dateString,
         dayNumber: dayNumber,
         isCurrentMonth: date.getMonth() === monthIndex,
         isToday: date.toDateString() === new Date().toDateString(),
@@ -173,6 +214,9 @@ export default {
     },
     getDayEvents(monthIndex, dayNumber) {
       const dayData = this.getDayData(monthIndex, dayNumber);
+      if (dayData.events.length > 0) {
+        console.log(`Events for ${dayData.date}:`, dayData.events);
+      }
       return dayData.events;
     },
     getWeekNumber(monthIndex, dayNumber) {
@@ -222,7 +266,68 @@ export default {
       const date = new Date(year, monthIndex, dayNumber);
       return date.getDay() === 0 || date.getDay() === 6; // Sunday or Saturday
     },
+    isToday(monthIndex, dayNumber) {
+      const date = new Date(
+        this.currentDate.getFullYear(),
+        monthIndex,
+        dayNumber
+      );
+      return date.toDateString() === new Date().toDateString();
+    },
+    
+    async loadHolidays() {
+      console.log('Loading holidays for year:', this.currentDate.getFullYear());
+      if (this.bankHolidays === 'None') {
+        this.holidays = {};
+        return;
+      }
+      
+      this.isLoadingHolidays = true;
+      try {
+        const year = this.currentDate.getFullYear();
+        this.holidays = await holidayService.getHolidaysForYear(year, this.bankHolidays);
+        console.log('Loaded holidays:', this.holidays);
+      } catch (error) {
+        console.error('Error loading holidays:', error);
+        this.holidays = {};
+      } finally {
+        this.isLoadingHolidays = false;
+      }
+    },
+    
+    isHoliday(monthIndex, dayNumber) {
+      if (!this.isValidDay(monthIndex, dayNumber)) return false;
+      
+      const date = new Date(this.currentDate.getFullYear(), monthIndex, dayNumber);
+      const dateString = date.toISOString().split('T')[0];
+      return this.holidays[dateString] !== undefined;
+    },
+    
+    getHolidayName(monthIndex, dayNumber) {
+      if (!this.isValidDay(monthIndex, dayNumber)) return '';
+      
+      const date = new Date(this.currentDate.getFullYear(), monthIndex, dayNumber);
+      const dateString = date.toISOString().split('T')[0];
+      const holiday = this.holidays[dateString];
+      return holiday ? holiday.name : '';
+    },
   },
+  async mounted() {
+    await this.loadHolidays();
+  },
+  watch: {
+    currentDate: {
+      handler: async function() {
+        await this.loadHolidays();
+      },
+      deep: true
+    },
+    bankHolidays: {
+      handler: async function() {
+        await this.loadHolidays();
+      }
+    }
+  }
 };
 </script>
 
@@ -231,8 +336,10 @@ export default {
   background: white;
   border-radius: 8px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-  overflow: hidden;
   padding: 20px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
 }
 
 .year-calendar {
@@ -240,6 +347,8 @@ export default {
   flex-direction: column;
   min-width: 100%;
   overflow-x: auto;
+  overflow-y: auto;
+  flex: 1;
 
   /* Apply to any element you want to make unselectable */
   -webkit-user-select: none;  /* Chrome, Safari, newer Opera */
@@ -259,6 +368,11 @@ export default {
   border-bottom: 2px solid #dee2e6;
   font-weight: bold;
   background-color: #f8f9fa;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  flex-shrink: 0;
 }
 
 .day-label {
@@ -276,7 +390,7 @@ export default {
 .month-header {
   flex: 1;
   min-width: 120px;
-  padding: 15px 10px;
+  padding: 3px;
   text-align: center;
   border-right: 1px solid #dee2e6;
   display: flex;
@@ -284,6 +398,7 @@ export default {
   align-items: center;
   justify-content: center;
   position: relative;
+  font-size: 0.8rem;
 }
 
 .quarter-label {
@@ -329,12 +444,12 @@ export default {
 .day-content {
   height: 100%;
   display: flex;
-  flex-direction: column;
-  justify-content: space-between;
+  /* flex-direction: inline; */
+  /* justify-content: space-between; */
 }
 
 .day-number {
-  font-size: 1.2rem;
+  font-size: 0.8rem;
   font-weight: bold;
   color: #333;
 }
@@ -362,6 +477,52 @@ export default {
   font-size: 0.7rem;
   color: #007bff;
   font-weight: bold;
+}
+
+.is-weekend {
+  background-color: rgba(141, 134, 134, 0.1) !important;
+  filter: brightness(0.9);
+}
+
+.is-today {
+  /* use boostrap primary */
+  background-color: #007bff !important;
+}
+
+.is-holiday {
+  background-color: #dc3545 !important;
+  color: white !important;
+}
+
+.holiday-name {
+  font-size: 0.6rem;
+  font-weight: bold;
+  text-align: center;
+  margin-top: 2px;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.day-events {
+  margin-top: 2px;
+  max-height: 40px;
+  overflow-y: auto;
+}
+
+.event-name {
+  margin-bottom: 2px;
+}
+
+.event-name .badge {
+  font-size: 0.5rem;
+  padding: 2px 4px;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: block;
 }
 
 /* Month Color Classes */
@@ -399,11 +560,11 @@ export default {
 
 /* Highlight specific days */
 .day-cell .day-number:first-child {
-  background-color: #dc3545;
+  background-color: black;
   color: white;
   border-radius: 50%;
-  width: 24px;
-  height: 24px;
+  width: 20px;
+  height: 20px;
   display: flex;
   align-items: center;
   justify-content: center;

@@ -3,29 +3,6 @@
     <div class="calendar-header">
       <h1>Calendar</h1>
       <div class="calendar-controls">
-        <div class="view-controls">
-          <button 
-            @click="currentView = 'month'" 
-            class="btn btn-sm"
-            :class="currentView === 'month' ? 'btn-primary' : 'btn-outline-primary'"
-          >
-            Month
-          </button>
-          <button 
-            @click="currentView = 'week'" 
-            class="btn btn-sm"
-            :class="currentView === 'week' ? 'btn-primary' : 'btn-outline-primary'"
-          >
-            Week
-          </button>
-          <button 
-            @click="currentView = 'full'" 
-            class="btn btn-sm"
-            :class="currentView === 'full' ? 'btn-primary' : 'btn-outline-primary'"
-          >
-            Full Year
-          </button>
-        </div>
         <div class="navigation-controls">
           <button @click="previousPeriod" class="btn btn-outline-primary">
             <i class="bi bi-chevron-left"></i>
@@ -43,63 +20,33 @@
 
     <!-- Category Filter -->
     <div class="category-filter">
-      <h4>Filter by Category</h4>
+      <h4>Controls</h4>
       <div class="category-buttons">
-        <button 
-          @click="selectedCategory = null" 
-          class="btn btn-sm"
-          :class="selectedCategory === null ? 'btn-primary' : 'btn-outline-primary'"
-        >
-          All Events
-        </button>
-        <button 
-          v-for="category in categories" 
-          :key="category.id"
-          @click="selectedCategory = category.id" 
-          class="btn btn-sm"
-          :class="selectedCategory === category.id ? 'btn-primary' : 'btn-outline-primary'"
-        >
-          <span class="category-dot" :style="{ backgroundColor: category.color }"></span>
-          {{ category.name }}
-        </button>
         <button @click="showCategoryManagement()" class="btn btn-sm btn-outline-secondary">
           <i class="bi bi-plus"></i> Add Category
         </button>
+
+        <button @click="showEventModal()" class="btn btn-sm btn-outline-secondary">
+          <i class="bi bi-plus"></i> Add Event
+        </button>
+
+        <button @click="showEventViewModal()" class="btn btn-sm btn-outline-primary">
+          <i class="bi bi-eye"></i> View Events
+        </button>
+
+        <!-- <button @click="togglePastMonths()" class="btn btn-sm btn-outline-danger" :class="{ 'btn-danger': !showPastMonths }">
+          <i class="bi bi-eye-slash"></i> {{ showPastMonths ? 'Hide past months' : 'Past months are hidden' }}
+        </button> -->
       </div>
     </div>
 
-    <!-- Month View -->
-    <MonthView 
-      v-if="currentView === 'month'"
-      :current-date="currentDate"
-      :events="events"
-      :categories="categories"
-      :selected-category="selectedCategory"
-      :week-start-day="weekStartDay"
-      :show-weekends="calendarSettings?.showWeekends !== false"
-      :show-event-dots="calendarSettings?.showEventDots !== false"
-      @select-date="selectDate"
-    />
-
-    <!-- Week View -->
-    <WeekView 
-      v-if="currentView === 'week'"
-      :current-date="currentDate"
-      :events="events"
-      :categories="categories"
-      :week-start-day="weekStartDay"
-      :business-hours-start="businessHoursStart"
-      :business-hours-end="businessHoursEnd"
-      @edit-event="editEvent"
-    />
-
     <!-- Full Year View -->
     <FullYearView 
-      v-if="currentView === 'full'"
       :current-date="currentDate"
       :events="events"
       :view-period="viewPeriod"
       :show-weekends="calendarSettings?.showWeekends !== false"
+      :bank-holidays="calendarSettings?.bankHolidays || 'None'"
       @select-date="selectDate"
     />
 
@@ -124,7 +71,17 @@
       @close-modal="closeCategoryModal"
     />
 
-    <!-- Events for Selected Date -->
+    <!-- Event View Modal -->
+    <EventViewModal
+      ref="eventViewModal"
+      :events="events"
+      :categories="categories"
+      @edit-event="editEventFromView"
+      @add-new-event="showEventModal"
+      @close-modal="closeEventViewModal"
+    />
+
+    <!-- Display Events for Selected Date -->
     <div v-if="selectedDateEvents.length > 0" class="selected-date-events">
       <h4>Events for {{ selectedDateFormatted }}</h4>
       <div class="event-list">
@@ -148,19 +105,17 @@
 </template>
 
 <script>
-import MonthView from './calendar/MonthView.vue'
-import WeekView from './calendar/WeekView.vue'
 import FullYearView from './calendar/FullYearView.vue'
 import EventModal from './calendar/EventModal.vue'
+import EventViewModal from './calendar/EventViewModal.vue'
 import CategoryModal from './calendar/CategoryModal.vue'
 
 export default {
   name: 'Calendar',
   components: {
-    MonthView,
-    WeekView,
     FullYearView,
     EventModal,
+    EventViewModal,
     CategoryModal
   },
   data() {
@@ -170,14 +125,18 @@ export default {
       events: [],
       newEvent: {
         title: '',
-        date: '',
-        time: '',
+        startDate: '',
+        endDate: '',
+        startTime: '',
+        endTime: '',
         description: '',
         categoryId: '',
-        duration: 1
+        isMultiDay: false,
+        eventDays: ''
       },
       isEditing: false,
       editingEventId: null,
+      openedFromEventView: false,
       categories: [
         { id: 1, name: 'Work', color: '#007bff' },
         { id: 2, name: 'Personal', color: '#28a745' },
@@ -186,28 +145,14 @@ export default {
         { id: 5, name: 'Other', color: '#6f42c1' },
       ],
       selectedCategory: null,
-      currentView: 'month',
       viewPeriod: 1,
       calendarSettings: null,
-      weekStartDay: 0, // Default to Sunday
-      businessHoursStart: '09:00',
-      businessHoursEnd: '17:00'
+      showPastMonths: false
     }
   },
   computed: {
     currentPeriodTitle() {
-      if (this.currentView === 'month') {
-        return this.currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-      } else if (this.currentView === 'week') {
-        const startDate = new Date(this.currentDate);
-        startDate.setDate(startDate.getDate() - startDate.getDay());
-        const endDate = new Date(startDate);
-        endDate.setDate(startDate.getDate() + 6);
-        return `${startDate.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' })} - ${endDate.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' })}`;
-      } else if (this.currentView === 'full') {
-        return this.currentDate.toLocaleDateString('en-US', { year: 'numeric' });
-      }
-      return '';
+      return this.currentDate.toLocaleDateString('en-US', { year: 'numeric' });
     },
     selectedDateEvents() {
       if (!this.selectedDate) return [];
@@ -238,11 +183,6 @@ export default {
     },
     applyCalendarSettings() {
       if (this.calendarSettings) {
-        // Apply default view
-        if (this.calendarSettings.defaultView) {
-          this.currentView = this.calendarSettings.defaultView;
-        }
-        
         // Apply default event duration
         if (this.calendarSettings.defaultEventDuration) {
           this.newEvent.duration = this.calendarSettings.defaultEventDuration;
@@ -253,38 +193,17 @@ export default {
           this.newEvent.categoryId = this.calendarSettings.defaultEventCategory;
         }
 
-        // Apply week start day setting
-        if (this.calendarSettings.weekStartDay !== undefined) {
-          // This will be used by the calendar views
-          this.weekStartDay = this.calendarSettings.weekStartDay;
-        }
-
-        // Apply business hours settings
-        if (this.calendarSettings.businessHoursStart) {
-          this.businessHoursStart = this.calendarSettings.businessHoursStart;
-        }
-        if (this.calendarSettings.businessHoursEnd) {
-          this.businessHoursEnd = this.calendarSettings.businessHoursEnd;
+        // Apply show past months setting
+        if (this.calendarSettings.showPastMonths !== undefined) {
+          this.showPastMonths = this.calendarSettings.showPastMonths;
         }
       }
     },
     previousPeriod() {
-      if (this.currentView === 'month') {
-        this.currentDate = new Date(this.currentDate.getFullYear(), this.currentDate.getMonth() - this.viewPeriod, 1);
-      } else if (this.currentView === 'week') {
-        this.currentDate = new Date(this.currentDate.getFullYear(), this.currentDate.getMonth(), this.currentDate.getDate() - 7 * this.viewPeriod);
-      } else if (this.currentView === 'full') {
-        this.currentDate = new Date(this.currentDate.getFullYear() - this.viewPeriod, 0, 1);
-      }
+      this.currentDate = new Date(this.currentDate.getFullYear() - this.viewPeriod, 0, 1);
     },
     nextPeriod() {
-      if (this.currentView === 'month') {
-        this.currentDate = new Date(this.currentDate.getFullYear(), this.currentDate.getMonth() + this.viewPeriod, 1);
-      } else if (this.currentView === 'week') {
-        this.currentDate = new Date(this.currentDate.getFullYear(), this.currentDate.getMonth(), this.currentDate.getDate() + 7 * this.viewPeriod);
-      } else if (this.currentView === 'full') {
-        this.currentDate = new Date(this.currentDate.getFullYear() + this.viewPeriod, 0, 1);
-      }
+      this.currentDate = new Date(this.currentDate.getFullYear() + this.viewPeriod, 0, 1);
     },
     goToToday() {
       this.currentDate = new Date();
@@ -297,19 +216,37 @@ export default {
     },
     showEventModal() {
       this.isEditing = false;
+      this.openedFromEventView = false; // Reset flag when opening normally
+      const selectedDate = this.selectedDate || new Date().toISOString().split('T')[0];
       this.newEvent = {
         title: '',
-        date: this.selectedDate || new Date().toISOString().split('T')[0],
-        time: '',
+        startDate: selectedDate,
+        endDate: selectedDate,
+        startTime: '',
+        endTime: '',
         description: '',
         categoryId: '',
-        duration: 1
+        isMultiDay: false,
+        eventDays: ''
       };
       this.$nextTick(() => {
         // Show modal using Vue refs
         if (this.$refs.eventModal) {
           this.$refs.eventModal.$el.style.display = 'block';
           this.$refs.eventModal.$el.classList.add('show');
+          document.body.classList.add('modal-open');
+          
+          // Add backdrop
+          this.addModalBackdrop();
+        }
+      });
+    },
+    showEventViewModal() {
+      this.$nextTick(() => {
+        // Show modal using Vue refs
+        if (this.$refs.eventViewModal) {
+          this.$refs.eventViewModal.$el.style.display = 'block';
+          this.$refs.eventViewModal.$el.classList.add('show');
           document.body.classList.add('modal-open');
           
           // Add backdrop
@@ -361,6 +298,12 @@ export default {
         document.body.classList.remove('modal-open');
         this.removeModalBackdrop();
       }
+      
+      // If the event modal was opened from the event view modal, don't close the view modal
+      if (this.openedFromEventView) {
+        this.openedFromEventView = false;
+        // Keep the event view modal open
+      }
     },
     showCategoryManagement() {
       this.$nextTick(() => {
@@ -371,7 +314,7 @@ export default {
           
           // Add backdrop
           this.addModalBackdrop();
-        }
+        }p
       });
     },
     saveCategory(category) {
@@ -395,6 +338,19 @@ export default {
       if (this.$refs.categoryModal) {
         this.$refs.categoryModal.$el.style.display = 'none';
         this.$refs.categoryModal.$el.classList.remove('show');
+        document.body.classList.remove('modal-open');
+        this.removeModalBackdrop();
+      }
+    },
+    editEventFromView(event) {
+      // Don't close the view modal, just open the edit modal with the selected event
+      this.openedFromEventView = true;
+      this.editEvent(event);
+    },
+    closeEventViewModal() {
+      if (this.$refs.eventViewModal) {
+        this.$refs.eventViewModal.$el.style.display = 'none';
+        this.$refs.eventViewModal.$el.classList.remove('show');
         document.body.classList.remove('modal-open');
         this.removeModalBackdrop();
       }
@@ -444,6 +400,31 @@ export default {
       if (event.key === 'productivity-tracker-settings') {
         this.loadCalendarSettings();
       }
+    },
+    togglePastMonths() {
+      this.showPastMonths = !this.showPastMonths;
+      if (this.calendarSettings) {
+        this.calendarSettings.showPastMonths = this.showPastMonths;
+        this.saveCalendarSettings();
+      }
+    },
+    
+    saveCalendarSettings() {
+      try {
+        const savedSettings = localStorage.getItem('productivity-tracker-settings');
+        let settings = savedSettings ? JSON.parse(savedSettings) : {};
+        
+        // Update calendar settings
+        settings.calendar = { ...settings.calendar, ...this.calendarSettings };
+        
+        // Save back to localStorage
+        localStorage.setItem('productivity-tracker-settings', JSON.stringify(settings));
+        
+        // Show success message
+        console.log('Calendar settings saved successfully');
+      } catch (error) {
+        console.error('Failed to save calendar settings:', error);
+      }
     }
   },
   mounted() {
@@ -479,10 +460,7 @@ export default {
   gap: 20px;
 }
 
-.view-controls {
-  display: flex;
-  gap: 10px;
-}
+
 
 .navigation-controls {
   display: flex;

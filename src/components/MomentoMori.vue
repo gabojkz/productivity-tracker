@@ -175,8 +175,9 @@ export default {
       const weeksInYear = 52;
       const weeksInLife = this.lifeExpectancy * weeksInYear;
 
-
       for (let i = 0; i < weeksInLife; i++) {
+        const dayOfLife = new Date(this.yearBorn, 0, 1);
+        dayOfLife.setDate(dayOfLife.getDate() + i);
         
         this.momentos.push({
           id: i,

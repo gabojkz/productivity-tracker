@@ -26,34 +26,74 @@
                 </option>
               </select>
             </div>
-            <div class="mb-3">
-              <label class="form-label">Date</label>
-              <input 
-                v-model="eventData.date" 
-                type="date" 
-                class="form-control" 
-                required
-              >
+            <div class="row">
+              <div class="col-md-6">
+                <div class="mb-3">
+                  <label class="form-label">Start Date</label>
+                  <input 
+                    v-model="eventData.startDate" 
+                    type="date" 
+                    class="form-control" 
+                    required
+                  >
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="mb-3">
+                  <label class="form-label">End Date</label>
+                  <input 
+                    v-model="eventData.endDate" 
+                    type="date" 
+                    class="form-control" 
+                    required
+                  >
+                </div>
+              </div>
+            </div>
+            <div class="row">
+              <div class="col-md-6">
+                <div class="mb-3">
+                  <label class="form-label">Start Time</label>
+                  <input 
+                    v-model="eventData.startTime" 
+                    type="time" 
+                    class="form-control"
+                  >
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="mb-3">
+                  <label class="form-label">End Time</label>
+                  <input 
+                    v-model="eventData.endTime" 
+                    type="time" 
+                    class="form-control"
+                  >
+                </div>
+              </div>
             </div>
             <div class="mb-3">
-              <label class="form-label">Time</label>
-              <input 
-                v-model="eventData.time" 
-                type="time" 
-                class="form-control"
-              >
+              <div class="form-check">
+                <input 
+                  v-model="eventData.isMultiDay" 
+                  class="form-check-input" 
+                  type="checkbox" 
+                  id="multiDayEvent"
+                >
+                <label class="form-check-label" for="multiDayEvent">
+                  Multi-day event (can span multiple days with gaps)
+                </label>
+              </div>
             </div>
-            <div class="mb-3">
-              <label class="form-label">Duration (hours)</label>
+            <div v-if="eventData.isMultiDay" class="mb-3">
+              <label class="form-label">Event Days (comma-separated dates)</label>
               <input 
-                v-model="eventData.duration" 
-                type="number" 
+                v-model="eventData.eventDays" 
+                type="text" 
                 class="form-control"
-                min="0.5"
-                max="24"
-                step="0.5"
-                value="1"
+                placeholder="2024-01-15, 2024-01-17, 2024-01-19"
               >
+              <small class="text-muted">Leave empty to use start and end date range</small>
             </div>
             <div class="mb-3">
               <label class="form-label">Description</label>
@@ -87,11 +127,14 @@ export default {
       type: Object,
       default: () => ({
         title: '',
-        date: '',
-        time: '',
+        startDate: '',
+        endDate: '',
+        startTime: '',
+        endTime: '',
         description: '',
         categoryId: '',
-        duration: 1
+        isMultiDay: false,
+        eventDays: ''
       })
     },
     categories: {
@@ -103,11 +146,14 @@ export default {
     return {
       eventData: {
         title: '',
-        date: '',
-        time: '',
+        startDate: '',
+        endDate: '',
+        startTime: '',
+        endTime: '',
         description: '',
         categoryId: '',
-        duration: 1
+        isMultiDay: false,
+        eventDays: ''
       }
     }
   },
@@ -117,9 +163,26 @@ export default {
         this.eventData = { ...newEvent };
       },
       immediate: true
+    },
+    'eventData.startDate': {
+      handler() {
+        this.checkMultiDay();
+      }
+    },
+    'eventData.endDate': {
+      handler() {
+        this.checkMultiDay();
+      }
     }
   },
   methods: {
+    checkMultiDay() {
+      if (this.eventData.startDate && this.eventData.endDate) {
+        const startDate = new Date(this.eventData.startDate);
+        const endDate = new Date(this.eventData.endDate);
+        this.eventData.isMultiDay = startDate.getTime() !== endDate.getTime();
+      }
+    },
     saveEvent() {
       this.$emit('save-event', this.eventData);
     },

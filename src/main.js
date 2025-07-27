@@ -19,11 +19,11 @@ import Calendar from "./components/Calendar.vue";
 const routes = [
   { path: "/", component: Dashboard },
   { path: "/tasks", component: Tasks },
+  { path: "/calendar", component: Calendar },
   { path: "/time-tracking", component: TimeTracking },
   { path: "/analytics", component: Analytics },
   { path: "/settings", component: Settings },
   { path: "/momento-mori", component: MomentoMori },
-  { path: "/calendar", component: Calendar },
 ];
 
 const router = createRouter({

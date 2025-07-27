@@ -37,6 +37,14 @@
               <div class="col-md-3 text-center">
                 <div class="display-4 text-success">{{ formatTime(currentSession.elapsed) }}</div>
                 <small class="text-muted">Elapsed Time</small>
+                <div class="progress mt-2" v-if="currentSession.duration">
+                  <div 
+                    class="progress-bar bg-success" 
+                    :style="{ width: Math.min((currentSession.elapsed / (currentSession.duration * 60)) * 100, 100) + '%' }"
+                  ></div>
+                </div>
+                <small class="text-muted" v-if="currentSession.duration">{{ Math.floor(currentSession.elapsed / 60) }}/{{ currentSession.duration }} min</small>
+                <small class="text-muted" v-else>{{ Math.floor(currentSession.elapsed / 60) }} min elapsed</small>
               </div>
               <div class="col-md-3 text-end">
                 <button class="btn btn-outline-success btn-sm" @click="pauseTracking">
@@ -353,8 +361,58 @@ export default {
   },
   mounted() {
     this.loadTimeEntries();
+    this.checkForFocusSession();
   },
   methods: {
+    checkForFocusSession() {
+      // Check if there's a focus session from Dashboard
+      const storedSession = localStorage.getItem('currentFocusSession');
+      if (storedSession) {
+        try {
+          const focusSession = JSON.parse(storedSession);
+          this.quickSession = {
+            task: focusSession.task,
+            description: focusSession.description,
+            duration: focusSession.duration
+          };
+          
+          // Auto-start the focus session
+          this.startTracking();
+          
+          // Clear the stored session
+          localStorage.removeItem('currentFocusSession');
+          
+          console.log('Focus session auto-started:', focusSession);
+        } catch (error) {
+          console.error('Error parsing focus session:', error);
+          localStorage.removeItem('currentFocusSession');
+        }
+      }
+      
+      // Check if there's a general time tracking session from Dashboard
+      const storedTimeTracking = localStorage.getItem('currentTimeTrackingSession');
+      if (storedTimeTracking) {
+        try {
+          const timeTrackingSession = JSON.parse(storedTimeTracking);
+          this.quickSession = {
+            task: timeTrackingSession.task,
+            description: timeTrackingSession.description,
+            duration: timeTrackingSession.duration || 0 // No fixed duration for general tracking
+          };
+          
+          // Auto-start the time tracking session
+          this.startTracking();
+          
+          // Clear the stored session
+          localStorage.removeItem('currentTimeTrackingSession');
+          
+          console.log('Time tracking session auto-started:', timeTrackingSession);
+        } catch (error) {
+          console.error('Error parsing time tracking session:', error);
+          localStorage.removeItem('currentTimeTrackingSession');
+        }
+      }
+    },
     async loadTimeEntries() {
       // Mock data - replace with actual database calls
       this.timeEntries = [
@@ -399,12 +457,18 @@ export default {
         task: this.quickSession.task,
         description: this.quickSession.description,
         startTime: new Date(),
-        elapsed: 0
+        elapsed: 0,
+        duration: this.quickSession.duration ? parseInt(this.quickSession.duration) : null
       };
       
       this.timer = setInterval(() => {
         if (!this.isPaused) {
           this.currentSession.elapsed += 1;
+          
+          // Check if session duration is reached (only for focus sessions with duration)
+          if (this.currentSession.duration && this.currentSession.elapsed >= this.currentSession.duration * 60) {
+            this.completeFocusSession();
+          }
         }
       }, 1000);
       
@@ -414,6 +478,37 @@ export default {
         description: '',
         duration: 25
       };
+    },
+    
+    completeFocusSession() {
+      this.stopTracking();
+      
+      // Show notification based on session type
+      const isFocusSession = this.currentSession.duration !== null;
+      const sessionType = isFocusSession ? 'Focus Session' : 'Time Tracking Session';
+      
+      if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification(`${sessionType} Complete!`, {
+          body: `Great job! You completed your ${this.currentSession.task} session.`,
+          icon: '/favicon.ico'
+        });
+      } else {
+        // Fallback alert
+        alert(`${sessionType} complete! Great job on "${this.currentSession.task}"`);
+      }
+      
+      // Add to time entries
+      const entry = {
+        id: Date.now(),
+        task: this.currentSession.task,
+        description: this.currentSession.description,
+        start_time: this.currentSession.startTime.toISOString(),
+        end_time: new Date().toISOString(),
+        duration_minutes: Math.floor(this.currentSession.elapsed / 60),
+        notes: `${sessionType} completed`
+      };
+      
+      this.timeEntries.unshift(entry);
     },
     
     pauseTracking() {

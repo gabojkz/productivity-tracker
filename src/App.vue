@@ -31,6 +31,11 @@ async function greet() {
               </router-link>
             </li>
             <li class="nav-item">
+              <router-link class="nav-link" to="/calendar">
+                <i class="bi bi-calendar3"></i> Calendar
+              </router-link>
+            </li>
+            <li class="nav-item">
               <router-link class="nav-link" to="/tasks">
                 <i class="bi bi-list-check"></i> Tasks
               </router-link>
@@ -41,18 +46,13 @@ async function greet() {
               </router-link>
             </li>
             <li class="nav-item">
-              <router-link class="nav-link" to="/analytics">
-                <i class="bi bi-bar-chart"></i> Analytics
-              </router-link>
-            </li>
-            <li class="nav-item">
-              <router-link class="nav-link" to="/calendar">
-                <i class="bi bi-calendar3"></i> Calendar
-              </router-link>
-            </li>
-            <li class="nav-item">
               <router-link class="nav-link" to="/momento-mori">
                 <i class="bi bi-bar-chart"></i> Momento Mori
+              </router-link>
+            </li>
+            <li class="nav-item">
+              <router-link class="nav-link" to="/analytics">
+                <i class="bi bi-bar-chart"></i> Analytics
               </router-link>
             </li>
           </ul>

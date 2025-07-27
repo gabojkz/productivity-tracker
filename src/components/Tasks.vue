@@ -89,6 +89,10 @@
                         <small class="text-muted">
                           Created: {{ formatDate(task.created_at) }}
                           <span v-if="task.due_date">• Due: {{ formatDate(task.due_date) }}</span>
+                          <span v-if="task.duration">• Duration: {{ task.duration }}h</span>
+                          <span v-if="task.isRunning" class="text-success fw-bold">
+                            • Timer: {{ formatTime(task.elapsedTime || 0) }}
+                          </span>
                         </small>
                       </div>
                     </div>
@@ -105,6 +109,28 @@
                   </div>
                   <div class="col-md-3">
                     <div class="d-flex justify-content-end gap-2">
+                      <button 
+                        v-if="!task.isRunning" 
+                        class="btn btn-success btn-sm" 
+                        @click="startTask(task)"
+                        :disabled="task.status === 'completed'"
+                      >
+                        <i class="bi bi-play"></i> Start
+                      </button>
+                      <button 
+                        v-if="task.isRunning" 
+                        class="btn btn-warning btn-sm" 
+                        @click="pauseTask(task)"
+                      >
+                        <i class="bi bi-pause"></i> Pause
+                      </button>
+                      <button 
+                        v-if="task.isRunning" 
+                        class="btn btn-danger btn-sm" 
+                        @click="stopTask(task)"
+                      >
+                        <i class="bi bi-stop"></i> Stop
+                      </button>
                       <button class="btn btn-outline-primary btn-sm" @click="editTask(task)">
                         <i class="bi bi-pencil"></i>
                       </button>
@@ -184,6 +210,15 @@
                 <label class="form-label">Due Date</label>
                 <input type="date" class="form-control" v-model="taskForm.due_date">
               </div>
+              <div class="mb-3">
+                <label class="form-label">Duration (hours)</label>
+                <input type="number" class="form-control" v-model="taskForm.duration" min="0.5" step="0.5" placeholder="1">
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Pomodoro Duration (minutes)</label>
+                <input type="number" class="form-control" v-model="taskForm.pomodoroDuration" min="5" max="60" placeholder="25">
+                <small class="text-muted">Default Pomodoro session length</small>
+              </div>
             </form>
           </div>
           <div class="modal-footer">
@@ -214,12 +249,16 @@ export default {
       itemsPerPage: 10,
       showAddTaskModal: false,
       editingTask: null,
+      activeTimer: null,
+      timerInterval: null,
       taskForm: {
         title: '',
         description: '',
         priority: 'medium',
         status: 'pending',
-        due_date: ''
+        due_date: '',
+        duration: 1,
+        pomodoroDuration: 25
       }
     }
   },
@@ -287,6 +326,16 @@ export default {
   },
   mounted() {
     this.loadTasks();
+    // Request notification permission
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+  },
+  beforeDestroy() {
+    // Clean up timer when component is destroyed
+    if (this.timerInterval) {
+      clearInterval(this.timerInterval);
+    }
   },
   methods: {
     async loadTasks() {
@@ -299,7 +348,12 @@ export default {
           status: 'pending',
           priority: 'high',
           created_at: '2024-01-15',
-          due_date: '2024-01-20'
+          due_date: '2024-01-20',
+          duration: 4,
+          pomodoroDuration: 25,
+          isRunning: false,
+          elapsedTime: 0,
+          startTime: null
         },
         {
           id: 2,
@@ -308,7 +362,12 @@ export default {
           status: 'completed',
           priority: 'medium',
           created_at: '2024-01-14',
-          due_date: '2024-01-16'
+          due_date: '2024-01-16',
+          duration: 2,
+          pomodoroDuration: 25,
+          isRunning: false,
+          elapsedTime: 0,
+          startTime: null
         },
         {
           id: 3,
@@ -317,7 +376,12 @@ export default {
           status: 'in-progress',
           priority: 'low',
           created_at: '2024-01-13',
-          due_date: '2024-01-18'
+          due_date: '2024-01-18',
+          duration: 1,
+          pomodoroDuration: 25,
+          isRunning: false,
+          elapsedTime: 0,
+          startTime: null
         },
         {
           id: 4,
@@ -326,7 +390,12 @@ export default {
           status: 'pending',
           priority: 'medium',
           created_at: '2024-01-12',
-          due_date: '2024-01-25'
+          due_date: '2024-01-25',
+          duration: 3,
+          pomodoroDuration: 25,
+          isRunning: false,
+          elapsedTime: 0,
+          startTime: null
         }
       ];
     },
@@ -378,7 +447,9 @@ export default {
         description: '',
         priority: 'medium',
         status: 'pending',
-        due_date: ''
+        due_date: '',
+        duration: 1,
+        pomodoroDuration: 25
       };
     },
     
@@ -401,6 +472,85 @@ export default {
         }
         
         this.closeModal();
+      }
+    },
+    
+    startTask(task) {
+      // Stop any currently running task
+      if (this.activeTimer) {
+        this.stopTask(this.activeTimer);
+      }
+      
+      // Set default due date to today if not set
+      if (!task.due_date) {
+        task.due_date = new Date().toISOString().split('T')[0];
+      }
+      
+      // Start the timer
+      task.isRunning = true;
+      task.startTime = new Date();
+      task.elapsedTime = task.elapsedTime || 0;
+      this.activeTimer = task;
+      
+      // Start the interval
+      this.timerInterval = setInterval(() => {
+        if (task.isRunning) {
+          task.elapsedTime += 1; // Increment by 1 second
+        }
+      }, 1000);
+      
+      // Show notification
+      this.showNotification(`Started task: ${task.title}`);
+      
+      // Update status to in-progress
+      task.status = 'in-progress';
+    },
+    
+    pauseTask(task) {
+      task.isRunning = false;
+      if (this.timerInterval) {
+        clearInterval(this.timerInterval);
+        this.timerInterval = null;
+      }
+      this.showNotification(`Paused task: ${task.title}`);
+    },
+    
+    stopTask(task) {
+      task.isRunning = false;
+      if (this.timerInterval) {
+        clearInterval(this.timerInterval);
+        this.timerInterval = null;
+      }
+      this.activeTimer = null;
+      
+      // Calculate total time spent
+      const totalHours = task.elapsedTime / 3600;
+      this.showNotification(`Completed task: ${task.title} (${totalHours.toFixed(2)} hours)`);
+      
+      // Optionally mark as completed if time spent is close to estimated duration
+      if (totalHours >= task.duration * 0.8) {
+        task.status = 'completed';
+      }
+    },
+    
+    formatTime(seconds) {
+      const hours = Math.floor(seconds / 3600);
+      const minutes = Math.floor((seconds % 3600) / 60);
+      const secs = seconds % 60;
+      
+      if (hours > 0) {
+        return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+      } else {
+        return `${minutes}:${secs.toString().padStart(2, '0')}`;
+      }
+    },
+    
+    showNotification(message) {
+      if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification('Task Timer', { body: message });
+      } else {
+        // Fallback to alert if notifications not available
+        console.log(message);
       }
     }
   }

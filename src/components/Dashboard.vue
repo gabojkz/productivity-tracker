@@ -130,7 +130,7 @@
           </div>
           <div class="card-body">
             <div class="d-grid gap-2">
-              <button class="btn btn-outline-primary" @click="startFocusSession">
+              <button class="btn btn-outline-primary" @click="openFocusSessionModal()">
                 <i class="bi bi-play-circle"></i> Start Focus Session
               </button>
               <button class="btn btn-outline-success" @click="showAddTaskModal = true">
@@ -170,7 +170,7 @@
     </div>
 
     <!-- Add Task Modal -->
-    <div class="modal fade" :class="{ show: showAddTaskModal }" :style="{ display: showAddTaskModal ? 'block' : 'none' }" tabindex="-1">
+    <div v-if="showAddTaskModal" class="modal fade show d-block" tabindex="-1">
       <div class="modal-dialog">
         <div class="modal-content">
           <div class="modal-header">
@@ -178,28 +178,32 @@
             <button type="button" class="btn-close" @click="showAddTaskModal = false"></button>
           </div>
           <div class="modal-body">
-            <form @submit.prevent="addTask">
-              <div class="mb-3">
-                <label class="form-label">Task Title</label>
-                <input type="text" class="form-control" v-model="newTask.title" required>
+            <div class="mb-3">
+              <label class="form-label">Task Title</label>
+              <input type="text" class="form-control" v-model="newTask.title" placeholder="Enter task title">
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Description</label>
+              <textarea class="form-control" v-model="newTask.description" rows="3" placeholder="Enter task description"></textarea>
+            </div>
+            <div class="row">
+              <div class="col-md-6">
+                <div class="mb-3">
+                  <label class="form-label">Priority</label>
+                  <select class="form-select" v-model="newTask.priority">
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                  </select>
+                </div>
               </div>
-              <div class="mb-3">
-                <label class="form-label">Description</label>
-                <textarea class="form-control" v-model="newTask.description" rows="3"></textarea>
+              <div class="col-md-6">
+                <div class="mb-3">
+                  <label class="form-label">Due Date</label>
+                  <input type="date" class="form-control" v-model="newTask.dueDate">
+                </div>
               </div>
-              <div class="mb-3">
-                <label class="form-label">Priority</label>
-                <select class="form-select" v-model="newTask.priority">
-                  <option value="low">Low</option>
-                  <option value="medium">Medium</option>
-                  <option value="high">High</option>
-                </select>
-              </div>
-              <div class="mb-3">
-                <label class="form-label">Due Date</label>
-                <input type="date" class="form-control" v-model="newTask.dueDate">
-              </div>
-            </form>
+            </div>
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-secondary" @click="showAddTaskModal = false">Cancel</button>
@@ -209,6 +213,55 @@
       </div>
     </div>
     <div v-if="showAddTaskModal" class="modal-backdrop fade show"></div>
+
+    <!-- Focus Session Modal -->
+    <div v-if="showFocusSessionModal" class="modal fade show d-block" tabindex="-1">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Start Focus Session</h5>
+            <button type="button" class="btn-close" @click="showFocusSessionModal = false"></button>
+          </div>
+          <div class="modal-body">
+            <div class="mb-3">
+              <label class="form-label">What are you working on?</label>
+              <input type="text" class="form-control" v-model="focusSession.task" placeholder="Enter task or activity">
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Description (optional)</label>
+              <textarea class="form-control" v-model="focusSession.description" rows="2" placeholder="Brief description of your focus session"></textarea>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Session Duration</label>
+              <select class="form-select" v-model="focusSession.duration">
+                <option value="25">25 minutes (Pomodoro)</option>
+                <option value="45">45 minutes</option>
+                <option value="60">1 hour</option>
+                <option value="90">1.5 hours</option>
+                <option value="120">2 hours</option>
+              </select>
+            </div>
+            <div class="alert alert-info">
+              <i class="bi bi-info-circle"></i>
+              <strong>Focus Session Tips:</strong>
+              <ul class="mb-0 mt-2">
+                <li>Choose a quiet environment</li>
+                <li>Turn off notifications</li>
+                <li>Have everything you need ready</li>
+                <li>Take short breaks between sessions</li>
+              </ul>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" @click="showFocusSessionModal = false">Cancel</button>
+            <button type="button" class="btn btn-primary" @click="startFocusSession">
+              <i class="bi bi-play-circle"></i> Start Session
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div v-if="showFocusSessionModal" class="modal-backdrop fade show"></div>
   </div>
 </template>
 
@@ -228,13 +281,40 @@ export default {
         description: '',
         priority: 'medium',
         dueDate: ''
+      },
+      showFocusSessionModal: false,
+      focusSession: {
+        task: '',
+        description: '',
+        duration: 25,
+        startTime: null
+      },
+      settings: {
+        defaultSessionDuration: 25
       }
     }
   },
   mounted() {
     this.loadDashboardData();
+    this.loadSettings();
   },
   methods: {
+    loadSettings() {
+      try {
+        const savedSettings = localStorage.getItem('productivity-tracker-settings');
+        if (savedSettings) {
+          const settings = JSON.parse(savedSettings);
+          this.settings = settings;
+          
+          // Set default focus session duration from settings
+          if (settings.defaultSessionDuration) {
+            this.focusSession.duration = settings.defaultSessionDuration;
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load settings:', error);
+      }
+    },
     async loadDashboardData() {
       // Load today's tasks
       this.todayTasks = [
@@ -289,14 +369,79 @@ export default {
       this.todayTasks = this.todayTasks.filter(task => task.id !== taskId);
     },
     
+    openFocusSessionModal() {
+      this.showFocusSessionModal = true;
+      this.focusSession.startTime = new Date();
+    },
+    
     startFocusSession() {
-      // TODO: Implement focus session functionality
-      console.log('Starting focus session...');
+      if (!this.focusSession.task.trim()) {
+        alert('Please enter what you are working on');
+        return;
+      }
+      
+      // Create a focus session with the configured settings
+      const session = {
+        task: this.focusSession.task,
+        description: this.focusSession.description,
+        duration: parseInt(this.focusSession.duration),
+        startTime: this.focusSession.startTime,
+        type: 'focus'
+      };
+      
+      // Store the focus session in localStorage for the TimeTracking component to access
+      localStorage.setItem('currentFocusSession', JSON.stringify(session));
+      
+      // Close the modal
+      this.showFocusSessionModal = false;
+      
+      // Reset the form
+      this.focusSession = {
+        task: '',
+        description: '',
+        duration: 25,
+        startTime: null
+      };
+      
+      // Navigate to the TimeTracking page to start the session
+      this.$router.push('/time-tracking');
+      
+      // Add to recent activity
+      this.recentActivity.unshift({
+        id: Date.now(),
+        type: 'session',
+        description: `Started focus session: ${session.task}`,
+        timestamp: new Date()
+      });
+      
+      console.log('Focus session started:', session);
     },
     
     startTimeTracking() {
-      // TODO: Implement time tracking functionality
-      console.log('Starting time tracking...');
+      // Create a general time tracking session (not a focus session)
+      const timeTrackingSession = {
+        task: 'Time Tracking',
+        description: 'General time tracking session',
+        duration: null, // No fixed duration for general tracking
+        startTime: new Date(),
+        type: 'tracking'
+      };
+      
+      // Store the time tracking session in localStorage
+      localStorage.setItem('currentTimeTrackingSession', JSON.stringify(timeTrackingSession));
+      
+      // Navigate to the TimeTracking page
+      this.$router.push('/time-tracking');
+      
+      // Add to recent activity
+      this.recentActivity.unshift({
+        id: Date.now(),
+        type: 'session',
+        description: 'Started time tracking session',
+        timestamp: new Date()
+      });
+      
+      console.log('Time tracking started:', timeTrackingSession);
     },
     
     addTask() {

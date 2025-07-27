@@ -7,7 +7,15 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "release:patch": "node scripts/release.js patch",
+    "release:minor": "node scripts/release.js minor",
+    "release:major": "node scripts/release.js major",
+    "release:preview": "node scripts/release.js preview",
+    "changelog": "node scripts/generate-changelog.js",
+    "version:check": "node scripts/check-versions.js",
+    "build:all": "npm run build && npm run tauri build",
+    "test": "echo \"No tests specified\" && exit 0"
   },
   "dependencies": {
     "vue": "^3.5.13",
@@ -24,6 +32,8 @@
   "devDependencies": {
     "@vitejs/plugin-vue": "^5.2.1",
     "vite": "^6.0.3",
-    "@tauri-apps/cli": "^2"
+    "@tauri-apps/cli": "^2",
+    "conventional-changelog-cli": "^4.1.0",
+    "semver": "^7.5.4"
   }
 }

@@ -130,27 +130,7 @@
             <h5 class="mb-0">Calendar Settings</h5>
           </div>
           <div class="card-body">
-            <div class="row">
-              <div class="col-md-6">
-                <div class="mb-3">
-                  <label class="form-label">Default Calendar View</label>
-                  <select class="form-select" v-model="settings.calendar.defaultView">
-                    <option value="month">Month</option>
-                    <option value="week">Week</option>
-                    <option value="full">Full Year</option>
-                  </select>
-                </div>
-              </div>
-              <div class="col-md-6">
-                <div class="mb-3">
-                  <label class="form-label">Week Start Day</label>
-                  <select class="form-select" v-model="settings.calendar.weekStartDay">
-                    <option value="0">Sunday</option>
-                    <option value="1">Monday</option>
-                  </select>
-                </div>
-              </div>
-            </div>
+
             
             <div class="row">
               <div class="col-md-6">
@@ -184,6 +164,10 @@
                   <input class="form-check-input" type="checkbox" v-model="settings.calendar.showEventDots">
                   <label class="form-check-label">Show Event Indicators</label>
                 </div>
+                <div class="form-check form-switch mb-3">
+                  <input class="form-check-input" type="checkbox" v-model="settings.calendar.showPastMonths">
+                  <label class="form-check-label">Show Past Months</label>
+                </div>
               </div>
               <div class="col-md-6">
                 <div class="form-check form-switch mb-3">
@@ -197,20 +181,7 @@
               </div>
             </div>
 
-            <div class="row">
-              <div class="col-md-6">
-                <div class="mb-3">
-                  <label class="form-label">Business Hours Start</label>
-                  <input type="time" class="form-control" v-model="settings.calendar.businessHoursStart">
-                </div>
-              </div>
-              <div class="col-md-6">
-                <div class="mb-3">
-                  <label class="form-label">Business Hours End</label>
-                  <input type="time" class="form-control" v-model="settings.calendar.businessHoursEnd">
-                </div>
-              </div>
-            </div>
+
 
 
             <!-- Calendar Bank Holidays -->
@@ -501,16 +472,13 @@ export default {
           language: 'en'
         },
         calendar: {
-          defaultView: 'month',
-          weekStartDay: 1, // Monday
           defaultEventDuration: 1,
           defaultEventCategory: '',
           showWeekends: true,
           showEventDots: true,
           enableDragAndDrop: true,
           showTodayHighlight: true,
-          businessHoursStart: '09:00',
-          businessHoursEnd: '17:00',
+          showPastMonths: false, // Default to hidden
           bankHolidays: 'None'
         },
         notifications: {
@@ -596,16 +564,12 @@ export default {
             language: 'en'
           },
           calendar: {
-            defaultView: 'month',
-            weekStartDay: 1, // Monday
             defaultEventDuration: 1,
             defaultEventCategory: '',
             showWeekends: true,
             showEventDots: true,
             enableDragAndDrop: true,
             showTodayHighlight: true,
-            businessHoursStart: '09:00',
-            businessHoursEnd: '17:00',
             bankHolidays: 'None'
           },
           notifications: {
