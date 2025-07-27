@@ -125,13 +125,23 @@ jobs:
           PKG_CONFIG_PATH: /usr/lib/x86_64-linux-gnu/pkgconfig:/usr/share/pkgconfig
           PKG_CONFIG_ALLOW_SYSTEM_CFLAGS: 1
 
-      - name: List build outputs
+      - name: List build outputs (Linux/macOS)
+        if: matrix.os != 'windows-latest'
         run: |
           echo "Build outputs in src-tauri/target/release/:"
           ls -la src-tauri/target/release/ || echo "No files found"
           echo ""
           echo "Build outputs in src-tauri/target/release/bundle/:"
           ls -la src-tauri/target/release/bundle/ || echo "No bundle directory found"
+
+      - name: List build outputs (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          echo "Build outputs in src-tauri/target/release/:"
+          dir src-tauri\target\release\ || echo "No files found"
+          echo ""
+          echo "Build outputs in src-tauri/target/release/bundle/:"
+          dir src-tauri\target\release\bundle\ || echo "No bundle directory found"
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -158,13 +168,24 @@ jobs:
         with:
           path: artifacts
 
-      - name: List downloaded artifacts
+      - name: List downloaded artifacts (Linux/macOS)
+        if: runner.os != 'Windows'
         run: |
           echo "Downloaded artifacts:"
           find artifacts -type f -name "*" || echo "No artifacts found"
           echo ""
           echo "Artifact directories:"
           ls -la artifacts/ || echo "No artifact directories found"
+
+      - name: List downloaded artifacts (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          echo "Downloaded artifacts:"
+          Get-ChildItem -Path artifacts -Recurse -File | Select-Object FullName
+          echo ""
+          echo "Artifact directories:"
+          Get-ChildItem -Path artifacts -Directory | Select-Object Name
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
