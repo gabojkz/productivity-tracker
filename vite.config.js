@@ -28,4 +28,12 @@ export default defineConfig(async () => ({
       ignored: ["**/src-tauri/**"],
     },
   },
+  build: {
+    rollupOptions: {
+      external: [
+        '@tauri-apps/api/tauri',
+        '@tauri-apps/api/event'
+      ]
+    }
+  }
 }));

@@ -1,15 +1,42 @@
-import { invoke } from '@tauri-apps/api/tauri'
-import { listen } from '@tauri-apps/api/event'
+// Tauri APIs - will be undefined in browser environment
+let invoke, listen;
+
+// Initialize Tauri APIs if available
+async function initTauriApis() {
+  try {
+    const tauriApi = await import('@tauri-apps/api/tauri');
+    const eventApi = await import('@tauri-apps/api/event');
+    invoke = tauriApi.invoke;
+    listen = eventApi.listen;
+    return true;
+  } catch (error) {
+    // Running in browser environment, not Tauri
+    console.warn('Tauri APIs not available - running in browser mode');
+    return false;
+  }
+}
 
 class UpdateService {
   constructor() {
     this.isUpdateAvailable = false
     this.updateInfo = null
     this.listeners = {}
+    this.init()
+  }
+
+  async init() {
+    // Initialize Tauri APIs if available
+    await initTauriApis();
     this.setupListeners()
   }
 
   async setupListeners() {
+    // Only setup listeners if Tauri APIs are available
+    if (!listen) {
+      console.warn('Tauri APIs not available - skipping update listeners');
+      return;
+    }
+
     // Listen for update events
     await listen('tauri://update-available', (event) => {
       console.log('Update available:', event.payload)
@@ -35,6 +62,11 @@ class UpdateService {
   }
 
   async checkForUpdates() {
+    if (!invoke) {
+      console.warn('Tauri APIs not available - cannot check for updates');
+      return;
+    }
+
     try {
       await invoke('plugin:updater|check')
       console.log('Update check initiated')
@@ -44,6 +76,11 @@ class UpdateService {
   }
 
   async installUpdate() {
+    if (!invoke) {
+      console.warn('Tauri APIs not available - cannot install update');
+      return;
+    }
+
     try {
       await invoke('plugin:updater|install')
       console.log('Update installation initiated')
@@ -88,6 +125,10 @@ class UpdateService {
 
   // Get current app version
   async getCurrentVersion() {
+    if (!invoke) {
+      return '0.1.0' // fallback for browser environment
+    }
+
     try {
       return await invoke('plugin:updater|get_current_version')
     } catch (error) {
