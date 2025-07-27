@@ -91,10 +91,9 @@ jobs:
       - name: Install system dependencies (macOS)
         if: matrix.os == 'macos-latest'
         run: |
-          brew install pkg-config
-          brew install webkitgtk
-          brew install gtk+3
-          brew install librsvg
+          # macOS doesn't need GTK dependencies for Tauri
+          # Tauri uses native macOS APIs
+          echo "macOS dependencies handled by Rust toolchain"
 
       - name: Install system dependencies (Windows)
         if: matrix.os == 'windows-latest'
@@ -113,6 +112,14 @@ jobs:
         env:
           PKG_CONFIG_PATH: /usr/lib/x86_64-linux-gnu/pkgconfig:/usr/share/pkgconfig
           PKG_CONFIG_ALLOW_SYSTEM_CFLAGS: 1
+
+      - name: Verify macOS setup
+        if: matrix.os == 'macos-latest'
+        run: |
+          echo "macOS version: $(sw_vers -productVersion)"
+          echo "Xcode version: $(xcodebuild -version | head -n 1)"
+          echo "Rust version: $(rustc --version)"
+          echo "Cargo version: $(cargo --version)"
 
       - name: Install Tauri CLI
         run: npm install -g @tauri-apps/cli
