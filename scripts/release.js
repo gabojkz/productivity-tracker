@@ -1,342 +1,229 @@
 #!/usr/bin/env node
 
-import fs from 'fs';
-import path from 'path';
-import { execSync } from 'child_process';
-import semver from 'semver';
-
-const RELEASE_TYPE = process.argv[2];
-
-if (!RELEASE_TYPE || !['patch', 'minor', 'major', 'preview'].includes(RELEASE_TYPE)) {
-  console.error('Usage: node scripts/release.js <patch|minor|major|preview>');
-  process.exit(1);
-}
+const { execSync } = require('child_process');
+const fs = require('fs');
+const path = require('path');
 
 // Configuration
 const CONFIG = {
-  packageJsonPath: './package.json',
-  cargoTomlPath: './src-tauri/Cargo.toml',
-  changelogPath: './CHANGELOG.md',
-  releaseNotesPath: './RELEASE_NOTES.md',
-  versionFile: './VERSION'
+  repo: 'YOUR_USERNAME/YOUR_REPO', // Replace with your GitHub repo
+  githubToken: process.env.GITHUB_TOKEN, // Set this in your environment
+  platforms: ['darwin-x86_64', 'darwin-aarch64', 'linux-x86_64', 'windows-x86_64']
 };
 
 // Colors for console output
 const colors = {
-  reset: '\x1b[0m',
-  bright: '\x1b[1m',
-  red: '\x1b[31m',
   green: '\x1b[32m',
+  red: '\x1b[31m',
   yellow: '\x1b[33m',
   blue: '\x1b[34m',
-  magenta: '\x1b[35m',
-  cyan: '\x1b[36m'
+  reset: '\x1b[0m'
 };
 
 function log(message, color = 'reset') {
   console.log(`${colors[color]}${message}${colors.reset}`);
 }
 
-function error(message) {
-  console.error(`${colors.red}ERROR: ${message}${colors.reset}`);
-}
-
-function success(message) {
-  console.log(`${colors.green}✓ ${message}${colors.reset}`);
-}
-
-function warning(message) {
-  console.log(`${colors.yellow}⚠ ${message}${colors.reset}`);
-}
-
-function info(message) {
-  console.log(`${colors.blue}ℹ ${message}${colors.reset}`);
-}
-
-// Utility functions
-function readJsonFile(filePath) {
+function exec(command, options = {}) {
   try {
-    const content = fs.readFileSync(filePath, 'utf8');
-    return JSON.parse(content);
-  } catch (err) {
-    error(`Failed to read ${filePath}: ${err.message}`);
+    return execSync(command, { stdio: 'inherit', ...options });
+  } catch (error) {
+    log(`Error executing: ${command}`, 'red');
     process.exit(1);
   }
+}
+
+function readJsonFile(filePath) {
+  return JSON.parse(fs.readFileSync(filePath, 'utf8'));
 }
 
 function writeJsonFile(filePath, data) {
-  try {
-    fs.writeFileSync(filePath, JSON.stringify(data, null, 2) + '\n');
-  } catch (err) {
-    error(`Failed to write ${filePath}: ${err.message}`);
-    process.exit(1);
+  fs.writeFileSync(filePath, JSON.stringify(data, null, 2) + '\n');
+}
+
+function updateVersion(type = 'patch') {
+  log('📦 Updating version...', 'blue');
+  
+  // Read current versions
+  const packageJson = readJsonFile('package.json');
+  const cargoToml = fs.readFileSync('src-tauri/Cargo.toml', 'utf8');
+  
+  // Parse current version
+  const currentVersion = packageJson.version;
+  const [major, minor, patch] = currentVersion.split('.').map(Number);
+  
+  // Calculate new version
+  let newVersion;
+  switch (type) {
+    case 'major':
+      newVersion = `${major + 1}.0.0`;
+      break;
+    case 'minor':
+      newVersion = `${major}.${minor + 1}.0`;
+      break;
+    case 'patch':
+    default:
+      newVersion = `${major}.${minor}.${patch + 1}`;
+      break;
   }
-}
-
-function readCargoToml() {
-  try {
-    const content = fs.readFileSync(CONFIG.cargoTomlPath, 'utf8');
-    const lines = content.split('\n');
-    const packageSection = {};
-    
-    let inPackageSection = false;
-    for (const line of lines) {
-      if (line.trim() === '[package]') {
-        inPackageSection = true;
-        continue;
-      }
-      if (inPackageSection && line.trim().startsWith('[')) {
-        break;
-      }
-      if (inPackageSection && line.includes('=')) {
-        const [key, value] = line.split('=').map(s => s.trim());
-        packageSection[key] = value.replace(/"/g, '');
-      }
-    }
-    
-    return packageSection;
-  } catch (err) {
-    error(`Failed to read ${CONFIG.cargoTomlPath}: ${err.message}`);
-    process.exit(1);
-  }
-}
-
-function writeCargoToml(version) {
-  try {
-    let content = fs.readFileSync(CONFIG.cargoTomlPath, 'utf8');
-    content = content.replace(/version = "([^"]+)"/, `version = "${version}"`);
-    fs.writeFileSync(CONFIG.cargoTomlPath, content);
-  } catch (err) {
-    error(`Failed to write ${CONFIG.cargoTomlPath}: ${err.message}`);
-    process.exit(1);
-  }
-}
-
-function getCurrentVersion() {
-  const packageJson = readJsonFile(CONFIG.packageJsonPath);
-  return packageJson.version;
-}
-
-function bumpVersion(currentVersion, releaseType) {
-  if (releaseType === 'preview') {
-    const prerelease = semver.prerelease(currentVersion);
-    if (prerelease) {
-      const [type, number] = prerelease;
-      return semver.inc(currentVersion, 'prerelease', type);
-    } else {
-      return semver.inc(currentVersion, 'prepatch');
-    }
-  }
-  return semver.inc(currentVersion, releaseType);
-}
-
-function updateVersions(newVersion) {
-  log('Updating version numbers...', 'blue');
+  
+  log(`Updating from ${currentVersion} to ${newVersion}`, 'yellow');
   
   // Update package.json
-  const packageJson = readJsonFile(CONFIG.packageJsonPath);
   packageJson.version = newVersion;
-  writeJsonFile(CONFIG.packageJsonPath, packageJson);
-  success(`Updated package.json to version ${newVersion}`);
+  writeJsonFile('package.json', packageJson);
   
   // Update Cargo.toml
-  writeCargoToml(newVersion);
-  success(`Updated Cargo.toml to version ${newVersion}`);
+  const cargoContent = cargoToml.replace(
+    /version = "[\d.]+"/,
+    `version = "${newVersion}"`
+  );
+  fs.writeFileSync('src-tauri/Cargo.toml', cargoContent);
   
-  // Write version to VERSION file
-  fs.writeFileSync(CONFIG.versionFile, newVersion + '\n');
-  success(`Updated VERSION file to ${newVersion}`);
+  // Update VERSION file
+  fs.writeFileSync('VERSION', newVersion);
+  
+  return newVersion;
 }
 
-function generateChangelog(newVersion) {
-  log('Generating changelog...', 'blue');
+function buildApp() {
+  log('🔨 Building app...', 'blue');
   
+  // Clean previous builds
+  exec('npm run clean || true');
+  
+  // Install dependencies
+  exec('npm install');
+  
+  // Build the app
+  exec('npm run tauri build');
+  
+  log('✅ Build completed successfully!', 'green');
+}
+
+function createGitHubRelease(version, releaseNotes) {
+  log('🚀 Creating GitHub release...', 'blue');
+  
+  if (!CONFIG.githubToken) {
+    log('❌ GITHUB_TOKEN environment variable not set', 'red');
+    log('Please set GITHUB_TOKEN=your_token_here', 'yellow');
+    return;
+  }
+  
+  // Create release notes file
+  const releaseNotesFile = 'RELEASE_NOTES.md';
+  fs.writeFileSync(releaseNotesFile, releaseNotes);
+  
+  // Get built files
+  const buildDir = 'src-tauri/target/release';
+  const files = fs.readdirSync(buildDir).filter(file => 
+    file.endsWith('.dmg') || file.endsWith('.AppImage') || file.endsWith('.msi') || file.endsWith('.exe')
+  );
+  
+  if (files.length === 0) {
+    log('❌ No built files found in target/release', 'red');
+    return;
+  }
+  
+  // Create GitHub release using gh CLI
   try {
-    // Get git log since last tag
-    const lastTag = execSync('git describe --tags --abbrev=0 2>/dev/null || echo ""', { encoding: 'utf8' }).trim();
-    const gitLog = lastTag 
-      ? execSync(`git log ${lastTag}..HEAD --oneline --no-merges`, { encoding: 'utf8' })
-      : execSync('git log --oneline --no-merges', { encoding: 'utf8' });
+    // Create release
+    exec(`gh release create v${version} --title "v${version}" --notes-file ${releaseNotesFile} --draft`);
     
-    const commits = gitLog.trim().split('\n').filter(line => line.trim());
+    // Upload assets
+    files.forEach(file => {
+      const filePath = path.join(buildDir, file);
+      log(`📤 Uploading ${file}...`, 'yellow');
+      exec(`gh release upload v${version} "${filePath}"`);
+    });
     
-    if (commits.length === 0) {
-      warning('No new commits found since last release');
-      return;
-    }
+    // Publish release
+    exec(`gh release edit v${version} --draft=false`);
     
-    // Categorize commits
-    const categories = {
-      'feat': '✨ Features',
-      'fix': '🐛 Bug Fixes',
-      'docs': '📚 Documentation',
-      'style': '💄 Styles',
-      'refactor': '♻️ Refactoring',
-      'perf': '⚡ Performance',
-      'test': '🧪 Tests',
-      'chore': '🔧 Chores',
-      'ci': '👷 CI/CD',
-      'build': '📦 Build',
-      'revert': '⏪ Reverts'
-    };
+    log('✅ GitHub release created successfully!', 'green');
     
-    const categorized = {};
+    // Clean up
+    fs.unlinkSync(releaseNotesFile);
     
-    for (const commit of commits) {
-      const match = commit.match(/^[a-f0-9]+ (.+)$/);
-      if (match) {
-        const message = match[1];
-        let category = 'other';
-        
-        // Check for conventional commit format
-        for (const [prefix, cat] of Object.entries(categories)) {
-          if (message.toLowerCase().startsWith(prefix + ':')) {
-            category = cat;
-            break;
-          }
-        }
-        
-        if (!categorized[category]) {
-          categorized[category] = [];
-        }
-        categorized[category].push(message);
-      }
-    }
-    
-    // Generate changelog content
-    let changelog = `# Changelog\n\n`;
-    changelog += `## [${newVersion}] - ${new Date().toISOString().split('T')[0]}\n\n`;
-    
-    for (const [category, messages] of Object.entries(categorized)) {
-      if (messages.length > 0) {
-        changelog += `### ${category}\n\n`;
-        for (const message of messages) {
-          changelog += `- ${message}\n`;
-        }
-        changelog += '\n';
-      }
-    }
-    
-    // Read existing changelog
-    let existingChangelog = '';
-    try {
-      existingChangelog = fs.readFileSync(CONFIG.changelogPath, 'utf8');
-    } catch (err) {
-      // File doesn't exist, that's okay
-    }
-    
-    // Prepend new changelog
-    const fullChangelog = changelog + existingChangelog;
-    fs.writeFileSync(CONFIG.changelogPath, fullChangelog);
-    
-    success(`Generated changelog for version ${newVersion}`);
-  } catch (err) {
-    error(`Failed to generate changelog: ${err.message}`);
+  } catch (error) {
+    log('❌ Failed to create GitHub release', 'red');
+    log('Make sure you have GitHub CLI installed and authenticated', 'yellow');
+    log('Install with: brew install gh && gh auth login', 'yellow');
   }
 }
 
-function createReleaseNotes(newVersion) {
-  log('Creating release notes...', 'blue');
+function generateReleaseNotes(version, type) {
+  const date = new Date().toISOString().split('T')[0];
   
-  try {
-    const changelog = fs.readFileSync(CONFIG.changelogPath, 'utf8');
-    const versionSection = changelog.split('## [')[1]?.split('## [')[0];
-    
-    if (versionSection) {
-      const releaseNotes = `# Release Notes - ${newVersion}\n\n${versionSection}`;
-      fs.writeFileSync(CONFIG.releaseNotesPath, releaseNotes);
-      success(`Created release notes for version ${newVersion}`);
-    }
-  } catch (err) {
-    warning(`Could not create release notes: ${err.message}`);
-  }
+  return `# Release v${version}
+
+## What's New
+- Bug fixes and improvements
+- Enhanced user experience
+- Performance optimizations
+
+## Changes
+- Automated release process
+- Auto-update functionality
+- Improved stability
+
+## Installation
+Download the latest version for your platform from the assets below.
+
+---
+*Released on ${date}*
+`;
 }
 
-function checkGitStatus() {
-  log('Checking git status...', 'blue');
+function commitAndPush(version) {
+  log('📝 Committing changes...', 'blue');
   
-  try {
-    const status = execSync('git status --porcelain', { encoding: 'utf8' });
-    if (status.trim()) {
-      error('Working directory is not clean. Please commit or stash your changes.');
-      console.log('\nUncommitted changes:');
-      console.log(status);
-      process.exit(1);
-    }
-    success('Git working directory is clean');
-  } catch (err) {
-    error(`Failed to check git status: ${err.message}`);
-    process.exit(1);
-  }
-}
-
-function createGitTag(version) {
-  log('Creating git tag...', 'blue');
+  exec('git add .');
+  exec(`git commit -m "Release v${version}"`);
+  exec('git push origin main');
   
-  try {
-    execSync(`git add .`);
-    execSync(`git commit -m "chore: bump version to ${version}"`);
-    execSync(`git tag -a v${version} -m "Release version ${version}"`);
-    success(`Created git tag v${version}`);
-  } catch (err) {
-    error(`Failed to create git tag: ${err.message}`);
-    process.exit(1);
-  }
-}
-
-function buildApplication() {
-  log('Building application...', 'blue');
-  
-  try {
-    execSync('npm run build:all', { stdio: 'inherit' });
-    success('Application built successfully');
-  } catch (err) {
-    error('Build failed');
-    process.exit(1);
-  }
+  log('✅ Changes pushed to GitHub!', 'green');
 }
 
 function main() {
-  log(`🚀 Starting release process for type: ${RELEASE_TYPE}`, 'bright');
+  const args = process.argv.slice(2);
+  const type = args[0] || 'patch';
+  const skipBuild = args.includes('--skip-build');
+  const skipRelease = args.includes('--skip-release');
   
-  // Check git status
-  checkGitStatus();
+  log('🚀 Starting automated release process...', 'green');
   
-  // Get current version
-  const currentVersion = getCurrentVersion();
-  log(`Current version: ${currentVersion}`, 'cyan');
-  
-  // Calculate new version
-  const newVersion = bumpVersion(currentVersion, RELEASE_TYPE);
-  log(`New version: ${newVersion}`, 'cyan');
-  
-  // Update versions in all files
-  updateVersions(newVersion);
-  
-  // Generate changelog
-  generateChangelog(newVersion);
-  
-  // Create release notes
-  createReleaseNotes(newVersion);
-  
-  // Create git tag
-  createGitTag(newVersion);
-  
-  // Build application
-  buildApplication();
-  
-  log('\n🎉 Release completed successfully!', 'green');
-  log(`\nNext steps:`, 'bright');
-  log(`1. Review the changes: git log --oneline -10`);
-  log(`2. Push the tag: git push origin v${newVersion}`);
-  log(`3. Push the changes: git push origin main`);
-  log(`4. Create a GitHub release with the generated changelog`);
-  log(`5. Distribute the built application from src-tauri/target/release/`);
-  
-  if (RELEASE_TYPE === 'preview') {
-    log(`\n⚠️  This is a preview release. Consider creating a proper release later.`, 'yellow');
+  try {
+    // Update version
+    const newVersion = updateVersion(type);
+    
+    // Build app (unless skipped)
+    if (!skipBuild) {
+      buildApp();
+    }
+    
+    // Commit and push changes
+    commitAndPush(newVersion);
+    
+    // Create GitHub release (unless skipped)
+    if (!skipRelease) {
+      const releaseNotes = generateReleaseNotes(newVersion, type);
+      createGitHubRelease(newVersion, releaseNotes);
+    }
+    
+    log('🎉 Release process completed successfully!', 'green');
+    log(`📱 Users can now update to v${newVersion}`, 'blue');
+    
+  } catch (error) {
+    log('❌ Release process failed!', 'red');
+    console.error(error);
+    process.exit(1);
   }
 }
 
-// Run the release process
-main(); 
+// Run the script
+if (require.main === module) {
+  main();
+}
+
+module.exports = { updateVersion, buildApp, createGitHubRelease }; 

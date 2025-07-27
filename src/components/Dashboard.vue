@@ -1,485 +1,493 @@
 <template>
   <div class="dashboard">
-    <div class="row mb-4">
-      <div class="col-12">
-        <h1 class="h3 mb-0">Dashboard</h1>
-        <p class="text-muted">Welcome back! Here's your productivity overview.</p>
-      </div>
-    </div>
+    <!-- Header with Time and Weather -->
+    <TimeWeatherDisplay 
+      :current-time="currentTime"
+      :current-date="currentDate"
+      :weather="weather"
+      @refresh-location="refreshLocation"
+    />
 
-    <!-- Quick Stats -->
-    <div class="row mb-4">
-      <div class="col-md-3 mb-3">
-        <div class="card bg-primary text-white">
-          <div class="card-body">
-            <div class="d-flex justify-content-between">
-              <div>
-                <h6 class="card-title">Today's Tasks</h6>
-                <h3 class="mb-0">{{ todayTasks.length }}</h3>
-              </div>
-              <div class="align-self-center">
-                <i class="bi bi-list-check fs-1"></i>
-              </div>
-            </div>
-          </div>
-        </div>
+    <!-- Quick Actions, Today's Tasks, and Yearly Goals -->
+    <div class="row mb-4 g-2">
+      <!-- Quick Actions -->
+      <div class="col-md-3">
+        <QuickActions 
+          @start-focus-session="startFocusSession"
+          @start-time-tracking="startTimeTracking"
+        />
       </div>
-      
-      <div class="col-md-3 mb-3">
-        <div class="card bg-success text-white">
-          <div class="card-body">
-            <div class="d-flex justify-content-between">
-              <div>
-                <h6 class="card-title">Completed</h6>
-                <h3 class="mb-0">{{ completedTasks.length }}</h3>
-              </div>
-              <div class="align-self-center">
-                <i class="bi bi-check-circle fs-1"></i>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-      
-      <div class="col-md-3 mb-3">
-        <div class="card bg-info text-white">
-          <div class="card-body">
-            <div class="d-flex justify-content-between">
-              <div>
-                <h6 class="card-title">Focus Time</h6>
-                <h3 class="mb-0">{{ focusHours }}h</h3>
-              </div>
-              <div class="align-self-center">
-                <i class="bi bi-clock fs-1"></i>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-      
-      <div class="col-md-3 mb-3">
-        <div class="card bg-warning text-white">
-          <div class="card-body">
-            <div class="d-flex justify-content-between">
-              <div>
-                <h6 class="card-title">Productivity Score</h6>
-                <h3 class="mb-0">{{ productivityScore }}%</h3>
-              </div>
-              <div class="align-self-center">
-                <i class="bi bi-graph-up fs-1"></i>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
 
-    <!-- Main Content -->
-    <div class="row">
       <!-- Today's Tasks -->
-      <div class="col-lg-8 mb-4">
-        <div class="card">
-          <div class="card-header d-flex justify-content-between align-items-center">
-            <h5 class="mb-0">Today's Tasks</h5>
-            <button class="btn btn-primary btn-sm" @click="showAddTaskModal = true">
-              <i class="bi bi-plus"></i> Add Task
-            </button>
-          </div>
-          <div class="card-body">
-            <div v-if="todayTasks.length === 0" class="text-center py-4">
-              <i class="bi bi-list-check fs-1 text-muted"></i>
-              <p class="text-muted mt-2">No tasks for today. Add your first task!</p>
-            </div>
-            <div v-else>
-              <div v-for="task in todayTasks" :key="task.id" class="task-item border-bottom py-3">
-                <div class="d-flex justify-content-between align-items-center">
-                  <div class="d-flex align-items-center">
-                    <input 
-                      type="checkbox" 
-                      class="form-check-input me-3" 
-                      :checked="task.status === 'completed'"
-                      @change="toggleTaskStatus(task)"
-                    >
-                    <div>
-                      <h6 class="mb-1" :class="{ 'text-decoration-line-through': task.status === 'completed' }">
-                        {{ task.title }}
-                      </h6>
-                      <p class="text-muted mb-0 small">{{ task.description }}</p>
-                    </div>
-                  </div>
-                  <div class="d-flex align-items-center">
-                    <span :class="getPriorityBadgeClass(task.priority)" class="badge me-2">
-                      {{ task.priority }}
-                    </span>
-                    <button class="btn btn-outline-danger btn-sm" @click="deleteTask(task.id)">
-                      <i class="bi bi-trash"></i>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+      <div class="col-md-5">
+        <TodayTasks 
+          :tasks="todayTasks"
+          @toggle-task-status="toggleTaskStatus"
+          @start-task="startTask"
+          @pause-task="pauseTask"
+        />
       </div>
 
-      <!-- Quick Actions & Recent Activity -->
-      <div class="col-lg-4">
-        <div class="card mb-4">
-          <div class="card-header">
-            <h5 class="mb-0">Quick Actions</h5>
-          </div>
-          <div class="card-body">
-            <div class="d-grid gap-2">
-              <button class="btn btn-outline-primary" @click="openFocusSessionModal()">
-                <i class="bi bi-play-circle"></i> Start Focus Session
-              </button>
-              <button class="btn btn-outline-success" @click="showAddTaskModal = true">
-                <i class="bi bi-plus-circle"></i> Add New Task
-              </button>
-              <button class="btn btn-outline-info" @click="startTimeTracking">
-                <i class="bi bi-clock"></i> Start Time Tracking
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div class="card">
-          <div class="card-header">
-            <h5 class="mb-0">Recent Activity</h5>
-          </div>
-          <div class="card-body">
-            <div v-if="recentActivity.length === 0" class="text-center py-3">
-              <p class="text-muted small">No recent activity</p>
-            </div>
-            <div v-else>
-              <div v-for="activity in recentActivity" :key="activity.id" class="activity-item py-2">
-                <div class="d-flex align-items-center">
-                  <div class="activity-icon me-3">
-                    <i :class="getActivityIcon(activity.type)" class="text-primary"></i>
-                  </div>
-                  <div class="flex-grow-1">
-                    <p class="mb-0 small">{{ activity.description }}</p>
-                    <small class="text-muted">{{ formatTime(activity.timestamp) }}</small>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+      <!-- Yearly Goals -->
+      <div class="col-md-4">
+        <YearlyGoals 
+          :current-year="currentYear"
+          @goal-added="handleGoalAdded"
+          @goal-toggled="handleGoalToggled"
+          @goal-deleted="handleGoalDeleted"
+        />
       </div>
     </div>
 
-    <!-- Add Task Modal -->
-    <div v-if="showAddTaskModal" class="modal fade show d-block" tabindex="-1">
-      <div class="modal-dialog">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title">Add New Task</h5>
-            <button type="button" class="btn-close" @click="showAddTaskModal = false"></button>
-          </div>
-          <div class="modal-body">
-            <div class="mb-3">
-              <label class="form-label">Task Title</label>
-              <input type="text" class="form-control" v-model="newTask.title" placeholder="Enter task title">
-            </div>
-            <div class="mb-3">
-              <label class="form-label">Description</label>
-              <textarea class="form-control" v-model="newTask.description" rows="3" placeholder="Enter task description"></textarea>
-            </div>
-            <div class="row">
-              <div class="col-md-6">
-                <div class="mb-3">
-                  <label class="form-label">Priority</label>
-                  <select class="form-select" v-model="newTask.priority">
-                    <option value="low">Low</option>
-                    <option value="medium">Medium</option>
-                    <option value="high">High</option>
-                  </select>
-                </div>
-              </div>
-              <div class="col-md-6">
-                <div class="mb-3">
-                  <label class="form-label">Due Date</label>
-                  <input type="date" class="form-control" v-model="newTask.dueDate">
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" @click="showAddTaskModal = false">Cancel</button>
-            <button type="button" class="btn btn-primary" @click="addTask">Add Task</button>
-          </div>
-        </div>
-      </div>
+
+    <!-- Yesterday's Completed Tasks and Upcoming Events -->
+    <div class="row">
+      <!-- Yesterday's Completed Tasks -->
+      <YesterdayTasks :tasks="yesterdayCompletedTasks" />
+
+      <!-- Upcoming Calendar Events -->
+      <UpcomingEvents :events="upcomingEvents" :categories="categories" />
     </div>
-    <div v-if="showAddTaskModal" class="modal-backdrop fade show"></div>
 
     <!-- Focus Session Modal -->
-    <div v-if="showFocusSessionModal" class="modal fade show d-block" tabindex="-1">
-      <div class="modal-dialog">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title">Start Focus Session</h5>
-            <button type="button" class="btn-close" @click="showFocusSessionModal = false"></button>
-          </div>
-          <div class="modal-body">
-            <div class="mb-3">
-              <label class="form-label">What are you working on?</label>
-              <input type="text" class="form-control" v-model="focusSession.task" placeholder="Enter task or activity">
-            </div>
-            <div class="mb-3">
-              <label class="form-label">Description (optional)</label>
-              <textarea class="form-control" v-model="focusSession.description" rows="2" placeholder="Brief description of your focus session"></textarea>
-            </div>
-            <div class="mb-3">
-              <label class="form-label">Session Duration</label>
-              <select class="form-select" v-model="focusSession.duration">
-                <option value="25">25 minutes (Pomodoro)</option>
-                <option value="45">45 minutes</option>
-                <option value="60">1 hour</option>
-                <option value="90">1.5 hours</option>
-                <option value="120">2 hours</option>
-              </select>
-            </div>
-            <div class="alert alert-info">
-              <i class="bi bi-info-circle"></i>
-              <strong>Focus Session Tips:</strong>
-              <ul class="mb-0 mt-2">
-                <li>Choose a quiet environment</li>
-                <li>Turn off notifications</li>
-                <li>Have everything you need ready</li>
-                <li>Take short breaks between sessions</li>
-              </ul>
-            </div>
-          </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" @click="showFocusSessionModal = false">Cancel</button>
-            <button type="button" class="btn btn-primary" @click="startFocusSession">
-              <i class="bi bi-play-circle"></i> Start Session
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div v-if="showFocusSessionModal" class="modal-backdrop fade show"></div>
+    <FocusSessionModal 
+      :show-modal="showFocusSessionModal"
+      :session="focusSession"
+      @close-modal="closeFocusSessionModal"
+      @start-session="startFocusSessionFromModal"
+    />
   </div>
 </template>
 
 <script>
+import TimeWeatherDisplay from './dashboard/TimeWeatherDisplay.vue'
+import QuickActions from './dashboard/QuickActions.vue'
+import TodayTasks from './dashboard/TodayTasks.vue'
+import YesterdayTasks from './dashboard/YesterdayTasks.vue'
+import UpcomingEvents from './dashboard/UpcomingEvents.vue'
+import FocusSessionModal from './dashboard/FocusSessionModal.vue'
+import YearlyGoals from './dashboard/YearlyGoals.vue'
+
 export default {
   name: 'Dashboard',
+  components: {
+    TimeWeatherDisplay,
+    QuickActions,
+    TodayTasks,
+    YesterdayTasks,
+    UpcomingEvents,
+    FocusSessionModal,
+    YearlyGoals
+  },
   data() {
     return {
-      todayTasks: [],
-      completedTasks: [],
-      focusHours: 0,
-      productivityScore: 85,
-      recentActivity: [],
-      showAddTaskModal: false,
-      newTask: {
-        title: '',
-        description: '',
-        priority: 'medium',
-        dueDate: ''
+      currentTime: '',
+      currentDate: '',
+      currentYear: new Date().getFullYear(),
+      weather: {
+        temperature: 23,
+        condition: 'Cloudy',
+        high: 31,
+        low: 18,
+        windSpeed: 11,
+        sunrise: '06:00',
+        sunset: '20:10',
+        location: null,
+        latitude: null,
+        longitude: null,
+        lastUpdated: null
       },
       showFocusSessionModal: false,
       focusSession: {
         task: '',
-        description: '',
         duration: 25,
-        startTime: null
+        description: ''
       },
-      settings: {
-        defaultSessionDuration: 25
-      }
+      tasks: [],
+      events: [],
+      categories: [],
+      // Time awareness reactive values
+      yearProgress: 0,
+      quarterProgress: 0,
+      dayProgress: 0,
+      daysLeftInYear: 0,
+      currentQuarter: 'Q1',
+      timeLeftToday: '',
+      lifeProgress: 0,
+      yearsLeft: 50
+    }
+  },
+  computed: {
+    todayTasks() {
+      const today = new Date().toISOString().split('T')[0];
+      return this.tasks.filter(task => 
+        task.due_date === today && task.status !== 'completed'
+      );
+    },
+    yesterdayCompletedTasks() {
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      const yesterdayStr = yesterday.toISOString().split('T')[0];
+      return this.tasks.filter(task => 
+        task.status === 'completed' && task.completed_at === yesterdayStr
+      );
+    },
+    upcomingEvents() {
+      const today = new Date();
+      const nextWeek = new Date();
+      nextWeek.setDate(today.getDate() + 7);
+      
+      return this.events.filter(event => {
+        const eventDate = new Date(event.startDate || event.date);
+        return eventDate >= today && eventDate <= nextWeek;
+      }).sort((a, b) => {
+        const dateA = new Date(a.startDate || a.date);
+        const dateB = new Date(b.startDate || b.date);
+        return dateA - dateB;
+      });
     }
   },
   mounted() {
-    this.loadDashboardData();
-    this.loadSettings();
+    this.updateTime();
+    this.loadData();
+    this.loadWeatherSettings();
+    setInterval(this.updateTime, 1000);
+    
+    // Try to get location on startup if not already set
+    if (!this.weather.location) {
+      this.refreshLocation();
+    }
   },
   methods: {
-    loadSettings() {
+    updateTime() {
+      const now = new Date();
+      
+      // Update current time and date
+      this.currentTime = now.toLocaleTimeString('en-US', { 
+        hour12: false,
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      });
+      this.currentDate = now.toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+      
+      // Calculate year progress
+      const startOfYear = new Date(now.getFullYear(), 0, 1);
+      const endOfYear = new Date(now.getFullYear(), 11, 31);
+      const yearTotal = endOfYear - startOfYear;
+      const yearElapsed = now - startOfYear;
+      this.yearProgress = Math.round((yearElapsed / yearTotal) * 100);
+      
+      // Calculate quarter progress
+      const quarter = Math.floor(now.getMonth() / 3);
+      const startOfQuarter = new Date(now.getFullYear(), quarter * 3, 1);
+      const endOfQuarter = new Date(now.getFullYear(), (quarter + 1) * 3, 0);
+      const quarterTotal = endOfQuarter - startOfQuarter;
+      const quarterElapsed = now - startOfQuarter;
+      this.quarterProgress = Math.round((quarterElapsed / quarterTotal) * 100);
+      
+      // Calculate day progress
+      const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+      const dayTotal = endOfDay - startOfDay;
+      const dayElapsed = now - startOfDay;
+      this.dayProgress = Math.round((dayElapsed / dayTotal) * 100);
+      
+      // Calculate days left in year
+      const diffTime = endOfYear - now;
+      this.daysLeftInYear = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      // Calculate current quarter
+      const quarters = ['Q1', 'Q2', 'Q3', 'Q4'];
+      this.currentQuarter = quarters[Math.floor(now.getMonth() / 3)];
+      
+      // Calculate time left today
+      const timeLeft = endOfDay - now;
+      const hours = Math.floor(timeLeft / (1000 * 60 * 60));
+      const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
+      this.timeLeftToday = `${hours}h ${minutes}m`;
+      
+      // Calculate life progress (mock values)
+      const age = 30; // Mock age
+      const lifeExpectancy = 80; // Mock life expectancy
+      this.lifeProgress = Math.round((age / lifeExpectancy) * 100);
+      this.yearsLeft = lifeExpectancy - age;
+    },
+    loadData() {
+      // Load tasks from localStorage
+      const savedTasks = localStorage.getItem('calendar-events');
+      if (savedTasks) {
+        this.tasks = JSON.parse(savedTasks);
+      }
+      
+      // Load events from localStorage
+      const savedEvents = localStorage.getItem('calendar-events');
+      if (savedEvents) {
+        this.events = JSON.parse(savedEvents);
+      }
+      
+      // Load categories from localStorage
+      const savedCategories = localStorage.getItem('calendar-categories');
+      if (savedCategories) {
+        this.categories = JSON.parse(savedCategories);
+      }
+    },
+    startFocusSession() {
+      this.showFocusSessionModal = true;
+    },
+    closeFocusSessionModal() {
+      this.showFocusSessionModal = false;
+      this.focusSession = {
+        task: '',
+        duration: 25,
+        description: ''
+      };
+    },
+    startFocusSessionFromModal() {
+      if (this.focusSession.task.trim()) {
+        const session = {
+          task: this.focusSession.task,
+          description: this.focusSession.description,
+          duration: this.focusSession.duration,
+          startTime: new Date(),
+          type: 'focus'
+        };
+        localStorage.setItem('currentFocusSession', JSON.stringify(session));
+        this.$router.push('/time-tracking');
+        this.closeFocusSessionModal();
+      }
+    },
+    startTimeTracking() {
+      const timeTrackingSession = {
+        task: 'Time Tracking',
+        description: 'General time tracking session',
+        duration: null,
+        startTime: new Date(),
+        type: 'tracking'
+      };
+      localStorage.setItem('currentTimeTrackingSession', JSON.stringify(timeTrackingSession));
+      this.$router.push('/time-tracking');
+    },
+    startTask(task) {
+      // Navigate to tasks page and start the specific task
+      this.$router.push('/tasks');
+      // The task starting logic is in the Tasks component
+    },
+    pauseTask(task) {
+      // This would be handled in the Tasks component
+      console.log('Pause task:', task.title);
+    },
+    toggleTaskStatus(task) {
+      task.status = task.status === 'completed' ? 'pending' : 'completed';
+      if (task.status === 'completed') {
+        task.completed_at = new Date().toISOString().split('T')[0];
+      }
+    },
+
+    
+    async getCurrentLocation() {
+      return new Promise((resolve, reject) => {
+        if (!navigator.geolocation) {
+          reject(new Error('Geolocation is not supported by this browser.'));
+          return;
+        }
+        
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            resolve({
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude
+            });
+          },
+          (error) => {
+            reject(error);
+          },
+          {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 60000
+          }
+        );
+      });
+    },
+    
+    async getLocationName(latitude, longitude) {
+      try {
+        const response = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=10&addressdetails=1`
+        );
+        const data = await response.json();
+        
+        if (data.display_name) {
+          // Extract city and country from the full address
+          const parts = data.display_name.split(', ');
+          const city = parts[0];
+          const country = parts[parts.length - 1];
+          return `${city}, ${country}`;
+        }
+        return 'Unknown location';
+      } catch (error) {
+        console.error('Error getting location name:', error);
+        return 'Unknown location';
+      }
+    },
+    
+    async fetchWeatherData(latitude, longitude) {
+      try {
+        // Using OpenWeatherMap API (you'll need to get a free API key)
+        // For now, we'll use mock data but structure it for real API integration
+        const apiKey = this.getWeatherApiKey();
+        
+        if (!apiKey) {
+          // Use mock data if no API key is available
+          return this.getMockWeatherData();
+        }
+        
+        const response = await fetch(
+          `https://api.openweathermap.org/data/2.5/weather?lat=${latitude}&lon=${longitude}&appid=${apiKey}&units=metric`
+        );
+        
+        if (!response.ok) {
+          throw new Error('Weather API request failed');
+        }
+        
+        const data = await response.json();
+        
+        return {
+          temperature: Math.round(data.main.temp),
+          condition: data.weather[0].main,
+          high: Math.round(data.main.temp_max),
+          low: Math.round(data.main.temp_min),
+          windSpeed: Math.round(data.wind.speed * 2.237), // Convert m/s to mph
+          sunrise: new Date(data.sys.sunrise * 1000).toLocaleTimeString('en-US', {
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false
+          }),
+          sunset: new Date(data.sys.sunset * 1000).toLocaleTimeString('en-US', {
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false
+          }),
+          lastUpdated: new Date().toISOString()
+        };
+      } catch (error) {
+        console.error('Error fetching weather data:', error);
+        return this.getMockWeatherData();
+      }
+    },
+    
+    getMockWeatherData() {
+      return {
+        temperature: Math.floor(Math.random() * 30) + 10,
+        condition: ['Sunny', 'Cloudy', 'Rainy', 'Partly Cloudy'][Math.floor(Math.random() * 4)],
+        high: Math.floor(Math.random() * 15) + 20,
+        low: Math.floor(Math.random() * 10) + 10,
+        windSpeed: Math.floor(Math.random() * 20) + 5,
+        sunrise: '06:00',
+        sunset: '20:10',
+        lastUpdated: new Date().toISOString()
+      };
+    },
+    
+    getWeatherApiKey() {
+      // Get API key from settings or environment
+      const settings = localStorage.getItem('productivity-tracker-settings');
+      if (settings) {
+        const parsed = JSON.parse(settings);
+        return parsed.weather?.apiKey || null;
+      }
+      return null;
+    },
+    
+    async refreshLocation() {
+      try {
+        const coords = await this.getCurrentLocation();
+        const locationName = await this.getLocationName(coords.latitude, coords.longitude);
+        const weatherData = await this.fetchWeatherData(coords.latitude, coords.longitude);
+        
+        this.weather = {
+          ...this.weather,
+          ...weatherData,
+          location: locationName,
+          latitude: coords.latitude,
+          longitude: coords.longitude
+        };
+        
+        // Save location to settings
+        this.saveWeatherSettings();
+        
+      } catch (error) {
+        console.error('Error refreshing location:', error);
+        alert('Unable to get your location. Please check your browser permissions.');
+      }
+    },
+    
+    saveWeatherSettings() {
+      try {
+        const savedSettings = localStorage.getItem('productivity-tracker-settings');
+        let settings = savedSettings ? JSON.parse(savedSettings) : {};
+        
+        settings.weather = {
+          ...settings.weather,
+          location: this.weather.location,
+          latitude: this.weather.latitude,
+          longitude: this.weather.longitude,
+          lastUpdated: this.weather.lastUpdated
+        };
+        
+        localStorage.setItem('productivity-tracker-settings', JSON.stringify(settings));
+      } catch (error) {
+        console.error('Failed to save weather settings:', error);
+      }
+    },
+    
+    loadWeatherSettings() {
       try {
         const savedSettings = localStorage.getItem('productivity-tracker-settings');
         if (savedSettings) {
           const settings = JSON.parse(savedSettings);
-          this.settings = settings;
-          
-          // Set default focus session duration from settings
-          if (settings.defaultSessionDuration) {
-            this.focusSession.duration = settings.defaultSessionDuration;
+          if (settings.weather) {
+            this.weather = {
+              ...this.weather,
+              location: settings.weather.location || null,
+              latitude: settings.weather.latitude || null,
+              longitude: settings.weather.longitude || null,
+              lastUpdated: settings.weather.lastUpdated || null
+            };
           }
         }
       } catch (error) {
-        console.error('Failed to load settings:', error);
+        console.error('Failed to load weather settings:', error);
       }
     },
-    async loadDashboardData() {
-      // Load today's tasks
-      this.todayTasks = [
-        { id: 1, title: 'Complete project proposal', description: 'Finish the Q4 project proposal document', status: 'pending', priority: 'high' },
-        { id: 2, title: 'Review code changes', description: 'Review pull requests for the main branch', status: 'completed', priority: 'medium' },
-        { id: 3, title: 'Team meeting', description: 'Weekly team sync meeting', status: 'pending', priority: 'low' }
-      ];
-      
-      this.completedTasks = this.todayTasks.filter(task => task.status === 'completed');
-      this.focusHours = 4.5;
-      this.recentActivity = [
-        { id: 1, type: 'task', description: 'Completed "Review code changes"', timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000) },
-        { id: 2, type: 'session', description: 'Started focus session', timestamp: new Date(Date.now() - 4 * 60 * 60 * 1000) },
-        { id: 3, type: 'task', description: 'Added new task "Team meeting"', timestamp: new Date(Date.now() - 6 * 60 * 60 * 1000) }
-      ];
+    
+    // Yearly Goals Event Handlers
+    handleGoalAdded(goal) {
+      console.log('Goal added:', goal);
+      // You can add additional logic here, like notifications
     },
     
-    getPriorityBadgeClass(priority) {
-      const classes = {
-        low: 'bg-secondary',
-        medium: 'bg-warning',
-        high: 'bg-danger'
-      };
-      return classes[priority] || 'bg-secondary';
+    handleGoalToggled(goal) {
+      console.log('Goal toggled:', goal);
+      // You can add additional logic here, like analytics
     },
     
-    getActivityIcon(type) {
-      const icons = {
-        task: 'bi bi-list-check',
-        session: 'bi bi-clock',
-        goal: 'bi bi-target'
-      };
-      return icons[type] || 'bi bi-info-circle';
-    },
-    
-    formatTime(timestamp) {
-      const now = new Date();
-      const diff = now - timestamp;
-      const hours = Math.floor(diff / (1000 * 60 * 60));
-      
-      if (hours < 1) return 'Just now';
-      if (hours === 1) return '1 hour ago';
-      return `${hours} hours ago`;
-    },
-    
-    toggleTaskStatus(task) {
-      task.status = task.status === 'completed' ? 'pending' : 'completed';
-      this.completedTasks = this.todayTasks.filter(t => t.status === 'completed');
-    },
-    
-    deleteTask(taskId) {
-      this.todayTasks = this.todayTasks.filter(task => task.id !== taskId);
-    },
-    
-    openFocusSessionModal() {
-      this.showFocusSessionModal = true;
-      this.focusSession.startTime = new Date();
-    },
-    
-    startFocusSession() {
-      if (!this.focusSession.task.trim()) {
-        alert('Please enter what you are working on');
-        return;
-      }
-      
-      // Create a focus session with the configured settings
-      const session = {
-        task: this.focusSession.task,
-        description: this.focusSession.description,
-        duration: parseInt(this.focusSession.duration),
-        startTime: this.focusSession.startTime,
-        type: 'focus'
-      };
-      
-      // Store the focus session in localStorage for the TimeTracking component to access
-      localStorage.setItem('currentFocusSession', JSON.stringify(session));
-      
-      // Close the modal
-      this.showFocusSessionModal = false;
-      
-      // Reset the form
-      this.focusSession = {
-        task: '',
-        description: '',
-        duration: 25,
-        startTime: null
-      };
-      
-      // Navigate to the TimeTracking page to start the session
-      this.$router.push('/time-tracking');
-      
-      // Add to recent activity
-      this.recentActivity.unshift({
-        id: Date.now(),
-        type: 'session',
-        description: `Started focus session: ${session.task}`,
-        timestamp: new Date()
-      });
-      
-      console.log('Focus session started:', session);
-    },
-    
-    startTimeTracking() {
-      // Create a general time tracking session (not a focus session)
-      const timeTrackingSession = {
-        task: 'Time Tracking',
-        description: 'General time tracking session',
-        duration: null, // No fixed duration for general tracking
-        startTime: new Date(),
-        type: 'tracking'
-      };
-      
-      // Store the time tracking session in localStorage
-      localStorage.setItem('currentTimeTrackingSession', JSON.stringify(timeTrackingSession));
-      
-      // Navigate to the TimeTracking page
-      this.$router.push('/time-tracking');
-      
-      // Add to recent activity
-      this.recentActivity.unshift({
-        id: Date.now(),
-        type: 'session',
-        description: 'Started time tracking session',
-        timestamp: new Date()
-      });
-      
-      console.log('Time tracking started:', timeTrackingSession);
-    },
-    
-    addTask() {
-      if (this.newTask.title.trim()) {
-        const task = {
-          id: Date.now(),
-          title: this.newTask.title,
-          description: this.newTask.description,
-          status: 'pending',
-          priority: this.newTask.priority,
-          dueDate: this.newTask.dueDate
-        };
-        
-        this.todayTasks.push(task);
-        this.showAddTaskModal = false;
-        this.newTask = {
-          title: '',
-          description: '',
-          priority: 'medium',
-          dueDate: ''
-        };
-      }
+    handleGoalDeleted(goalId) {
+      console.log('Goal deleted:', goalId);
+      // You can add additional logic here, like cleanup
     }
   }
 }
 </script>
 
 <style scoped>
-.task-item:last-child {
-  border-bottom: none !important;
-}
-
-.activity-item:not(:last-child) {
-  border-bottom: 1px solid #f0f0f0;
-}
-
-.activity-icon {
-  width: 24px;
-  text-align: center;
+.dashboard {
+  padding: 20px;
 }
 </style> 

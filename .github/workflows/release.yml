@@ -13,11 +13,14 @@ jobs:
         os: [macos-latest, ubuntu-latest, windows-latest]
         include:
           - os: macos-latest
-            target: x86_64-apple-darwin
+            platform: darwin-x86_64
+            artifact: productivity-tracker.app.tar.gz
           - os: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
+            platform: linux-x86_64
+            artifact: productivity-tracker.AppImage
           - os: windows-latest
-            target: x86_64-pc-windows-msvc
+            platform: windows-x86_64
+            artifact: productivity-tracker.msi
 
     steps:
       - name: Checkout code
@@ -33,7 +36,7 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
-          target: ${{ matrix.target }}
+          override: true
 
       - name: Install dependencies
         run: npm ci
@@ -42,41 +45,51 @@ jobs:
         run: npm install -g @tauri-apps/cli
 
       - name: Build application
-        run: npm run build:all
+        run: npm run tauri build
         env:
-          TARGET: ${{ matrix.target }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Create release assets
-        run: |
-          mkdir -p release
-          cp src-tauri/target/release/productivity-tracker* release/ || true
-          cp CHANGELOG.md release/ || true
-          cp RELEASE_NOTES.md release/ || true
-
-      - name: Upload release assets
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: productivity-tracker-${{ matrix.target }}
-          path: release/
+          name: ${{ matrix.artifact }}
+          path: src-tauri/target/release/
 
   create-release:
     needs: release
     runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4
+        with:
+          path: artifacts
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            productivity-tracker-macos-latest/**/*
-            productivity-tracker-ubuntu-latest/**/*
-            productivity-tracker-windows-latest/**/*
-          body_path: RELEASE_NOTES.md
+            artifacts/*.dmg
+            artifacts/*.AppImage
+            artifacts/*.msi
+            artifacts/*.exe
           generate_release_notes: true
+          draft: false
+          prerelease: false
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  notify:
+    needs: create-release
+    runs-on: ubuntu-latest
+    if: success()
+
+    steps:
+      - name: Notify success
+        run: |
+          echo "🎉 Release ${{ github.ref_name }} created successfully!"
+          echo "📱 Users can now update their apps automatically!" 

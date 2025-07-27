@@ -9,6 +9,7 @@ A modern desktop application built with Tauri, Vue.js, Bootstrap, and SQLite to 
 - Quick stats and progress indicators
 - Recent activity feed
 - Quick actions for common tasks
+- **Weather widget with location support**
 
 ### ✅ Task Management
 - Create, edit, and organize tasks
@@ -33,6 +34,7 @@ A modern desktop application built with Tauri, Vue.js, Bootstrap, and SQLite to 
 - Configure notifications
 - Manage data backup and retention
 - Keyboard shortcuts
+- **Weather API configuration and location settings**
 
 ## Technology Stack
 
@@ -73,6 +75,28 @@ npm run tauri dev
 ```bash
 npm run tauri build
 ```
+
+## Weather Feature
+
+The productivity tracker includes a weather widget that displays current weather conditions and location information.
+
+### Setup
+1. **Get an API Key**: Sign up for a free API key at [OpenWeatherMap](https://openweathermap.org/api)
+2. **Configure Settings**: Go to Settings → Weather Settings and enter your API key
+3. **Enable Location**: Click "Refresh Location" to allow the app to access your location
+4. **Auto-refresh**: Enable auto-refresh to keep weather data current
+
+### Features
+- **Location Detection**: Automatically detects your current location using browser geolocation
+- **Weather Data**: Displays temperature, conditions, wind speed, and sunrise/sunset times
+- **Location Display**: Shows your current city and country
+- **Manual Refresh**: Click the refresh button to update weather data
+- **Settings Integration**: Configure refresh intervals and display preferences
+
+### Privacy
+- Location data is only used for weather display
+- No location data is stored or transmitted to third parties
+- Weather API calls are made directly to OpenWeatherMap
 
 ## Project Structure
 

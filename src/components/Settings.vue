@@ -219,6 +219,128 @@
           </div>
         </div>
 
+        <!-- Weather Settings -->
+        <div class="card mb-4">
+          <div class="card-header">
+            <h5 class="mb-0">Weather Settings</h5>
+          </div>
+          <div class="card-body">
+            <div class="row">
+              <div class="col-md-6">
+                <div class="mb-3">
+                  <label class="form-label">OpenWeatherMap API Key</label>
+                  <input type="password" class="form-control" v-model="settings.weather.apiKey" placeholder="Enter your API key">
+                  <small class="text-muted">
+                    Get a free API key from 
+                    <a href="https://openweathermap.org/api" target="_blank" rel="noopener">OpenWeatherMap</a>
+                  </small>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="mb-3">
+                  <label class="form-label">Current Location</label>
+                  <input type="text" class="form-control" :value="currentLocation" readonly>
+                  <small class="text-muted">Location is automatically detected</small>
+                </div>
+              </div>
+            </div>
+            
+            <div class="row">
+              <div class="col-md-6">
+                <div class="form-check form-switch mb-3">
+                  <input class="form-check-input" type="checkbox" v-model="settings.weather.autoRefresh">
+                  <label class="form-check-label">Auto-refresh weather data</label>
+                </div>
+                <div class="form-check form-switch mb-3">
+                  <input class="form-check-input" type="checkbox" v-model="settings.weather.showLocation">
+                  <label class="form-check-label">Show location in weather widget</label>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="mb-3">
+                  <label class="form-label">Refresh Interval (minutes)</label>
+                  <select class="form-select" v-model="settings.weather.refreshInterval">
+                    <option value="15">15 minutes</option>
+                    <option value="30">30 minutes</option>
+                    <option value="60">1 hour</option>
+                    <option value="120">2 hours</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            
+            <div class="row">
+              <div class="col-12">
+                <button @click="testWeatherConnection" class="btn btn-outline-primary" :disabled="!settings.weather.apiKey">
+                  <i class="bi bi-cloud-check"></i> Test Weather Connection
+                </button>
+                <button @click="refreshLocationFromSettings" class="btn btn-outline-secondary ms-2">
+                  <i class="bi bi-geo-alt"></i> Refresh Location
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Update Settings -->
+        <div class="card mb-4">
+          <div class="card-header">
+            <h5 class="mb-0">App Updates</h5>
+          </div>
+          <div class="card-body">
+            <div class="row">
+              <div class="col-md-6">
+                <div class="mb-3">
+                  <label class="form-label">Current Version</label>
+                  <input 
+                    :value="currentVersion" 
+                    type="text" 
+                    class="form-control" 
+                    readonly
+                  />
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="mb-3">
+                  <label class="form-label">Update Status</label>
+                  <div class="d-flex align-items-center">
+                    <span 
+                      v-if="updateAvailable" 
+                      class="badge bg-success me-2"
+                    >
+                      Update Available
+                    </span>
+                    <span 
+                      v-else 
+                      class="badge bg-secondary me-2"
+                    >
+                      Up to Date
+                    </span>
+                    <button 
+                      class="btn btn-primary btn-sm" 
+                      @click="checkForUpdates"
+                      :disabled="checkingUpdate"
+                    >
+                      <i class="fas fa-sync-alt me-1" :class="{ 'fa-spin': checkingUpdate }"></i>
+                      Check for Updates
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div v-if="updateInfo" class="mt-3">
+              <div class="alert alert-info">
+                <h6>Update Available: {{ updateInfo.version }}</h6>
+                <p class="mb-2">{{ updateInfo.body || 'A new version is available for download.' }}</p>
+                <button class="btn btn-success btn-sm" @click="installUpdate">
+                  <i class="fas fa-download me-1"></i>
+                  Download & Install
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- Notifications -->
         <div class="card mb-4">
           <div class="card-header">
@@ -455,6 +577,8 @@
 </template>
 
 <script>
+import updateService from '../services/updateService.js'
+
 export default {
   name: 'Settings',
   data() {
@@ -492,11 +616,24 @@ export default {
         dataManagement: {
           autoBackup: 'weekly',
           retention: '365'
+        },
+        weather: {
+          apiKey: '',
+          autoRefresh: true,
+          showLocation: true,
+          refreshInterval: 30,
+          location: null,
+          latitude: null,
+          longitude: null
         }
       },
       showAboutModal: false,
       lastUpdated: new Date().toLocaleDateString(),
-      dataSize: '2.3 MB'
+      dataSize: '2.3 MB',
+      currentVersion: '0.1.0',
+      updateAvailable: false,
+      updateInfo: null,
+      checkingUpdate: false
     }
   },
   computed: {
@@ -518,13 +655,38 @@ export default {
         age--;
       }
       return age;
+    },
+    currentLocation() {
+      return this.settings.weather.location || 'Location not set';
     }
   },
   mounted() {
     this.loadSettings();
+    this.initializeUpdateService();
   },
-  methods: {
-    async loadSettings() {
+      methods: {
+      initializeUpdateService() {
+        // Listen for update events from the service
+        updateService.on('update-available', (updateInfo) => {
+          this.updateAvailable = true;
+          this.updateInfo = updateInfo;
+        });
+        
+        updateService.on('update-downloaded', () => {
+          this.showSuccessMessage('Update downloaded and ready to install');
+        });
+        
+        updateService.on('update-error', (error) => {
+          this.showErrorMessage(`Update error: ${error}`);
+        });
+        
+        // Get current version
+        updateService.getCurrentVersion().then(version => {
+          this.currentVersion = version;
+        });
+      },
+      
+      async loadSettings() {
       try {
         // Load settings from localStorage or database
         const savedSettings = localStorage.getItem('productivity-tracker-settings');
@@ -583,6 +745,15 @@ export default {
           dataManagement: {
             autoBackup: 'weekly',
             retention: '365'
+          },
+          weather: {
+            apiKey: '',
+            autoRefresh: true,
+            showLocation: true,
+            refreshInterval: 30,
+            location: null,
+            latitude: null,
+            longitude: null
           }
         };
       }
@@ -630,9 +801,26 @@ export default {
       }
     },
     
-    checkForUpdates() {
-      // TODO: Implement update check functionality
-      this.showInfoMessage('No updates available');
+    async checkForUpdates() {
+      this.checkingUpdate = true;
+      try {
+        await updateService.checkForUpdates();
+        // The update service will handle the events and update the UI
+      } catch (error) {
+        console.error('Failed to check for updates:', error);
+        this.showErrorMessage('Failed to check for updates');
+      } finally {
+        this.checkingUpdate = false;
+      }
+    },
+    
+    async installUpdate() {
+      try {
+        await updateService.installUpdate();
+      } catch (error) {
+        console.error('Failed to install update:', error);
+        this.showErrorMessage('Failed to install update');
+      }
     },
     
     showAbout() {
@@ -652,6 +840,94 @@ export default {
     showInfoMessage(message) {
       // TODO: Implement proper toast/notification system
       alert(message);
+    },
+    
+    async getCurrentLocation() {
+      return new Promise((resolve, reject) => {
+        if (!navigator.geolocation) {
+          reject(new Error('Geolocation is not supported by this browser.'));
+          return;
+        }
+        
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            resolve({
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude
+            });
+          },
+          (error) => {
+            reject(error);
+          },
+          {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 60000
+          }
+        );
+      });
+    },
+    
+    async getLocationName(latitude, longitude) {
+      try {
+        const response = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=10&addressdetails=1`
+        );
+        const data = await response.json();
+        
+        if (data.display_name) {
+          // Extract city and country from the full address
+          const parts = data.display_name.split(', ');
+          const city = parts[0];
+          const country = parts[parts.length - 1];
+          return `${city}, ${country}`;
+        }
+        return 'Unknown location';
+      } catch (error) {
+        console.error('Error getting location name:', error);
+        return 'Unknown location';
+      }
+    },
+    
+    async refreshLocationFromSettings() {
+      try {
+        const coords = await this.getCurrentLocation();
+        const locationName = await this.getLocationName(coords.latitude, coords.longitude);
+        
+        this.settings.weather.location = locationName;
+        this.settings.weather.latitude = coords.latitude;
+        this.settings.weather.longitude = coords.longitude;
+        
+        this.saveSettings();
+        this.showSuccessMessage('Location updated successfully!');
+        
+      } catch (error) {
+        console.error('Error refreshing location:', error);
+        this.showErrorMessage('Unable to get your location. Please check your browser permissions.');
+      }
+    },
+    
+    async testWeatherConnection() {
+      if (!this.settings.weather.apiKey) {
+        this.showErrorMessage('Please enter an API key first');
+        return;
+      }
+      
+      try {
+        // Test with a known location (London)
+        const response = await fetch(
+          `https://api.openweathermap.org/data/2.5/weather?lat=51.5074&lon=-0.1278&appid=${this.settings.weather.apiKey}&units=metric`
+        );
+        
+        if (response.ok) {
+          this.showSuccessMessage('Weather API connection successful!');
+        } else {
+          this.showErrorMessage('Weather API connection failed. Please check your API key.');
+        }
+      } catch (error) {
+        console.error('Weather API test failed:', error);
+        this.showErrorMessage('Weather API connection failed. Please check your API key and internet connection.');
+      }
     }
   }
 }

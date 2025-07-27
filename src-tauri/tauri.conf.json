@@ -37,6 +37,14 @@
   "plugins": {
     "sql": {
       "enabled": true
+    },
+    "updater": {
+      "enabled": true,
+      "endpoints": [
+        "https://api.github.com/repos/YOUR_USERNAME/YOUR_REPO/releases/latest"
+      ],
+      "dialog": true,
+      "pubkey": "YOUR_PUBLIC_KEY_HERE"
     }
   }
 }
